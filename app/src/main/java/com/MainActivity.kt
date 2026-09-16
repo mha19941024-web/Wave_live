@@ -1,26 +1,17 @@
 package com.vyro.app
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.material3.Text
 
-    <application
-        android:allowBackup="true"
-        android:label="Wave"
-        android:supportsRtl="true">
+class MainActivity : ComponentActivity() {
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-
-        </activity>
-
-    </application>
-
-</manifest>
+        setContent {
+            Text(text = "WAVE")
+        }
+    }
+}
