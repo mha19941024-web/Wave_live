@@ -1,6 +1,6 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    id("com.android.application") version "8.7.3"
+    id("org.jetbrains.kotlin.android") version "2.1.21"
 }
 
 android {
@@ -63,8 +63,4 @@ dependencies {
     implementation("com.google.firebase:firebase-storage")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
-}
-plugins {
-    id("com.android.application") version "8.7.3" apply false
-    id("org.jetbrains.kotlin.android") version "2.1.21" apply false
 }
