@@ -9,7 +9,7 @@
         android:allowBackup="true"
         android:label="Wave"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Wave">
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
 
         <activity
             android:name=".MainActivity"
