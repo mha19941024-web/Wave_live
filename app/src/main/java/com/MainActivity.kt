@@ -1,70 +1,26 @@
-package com.vyro.app
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-class MainActivity : ComponentActivity() {
+    <application
+        android:allowBackup="true"
+        android:label="Wave"
+        android:supportsRtl="true">
 
-override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
 
-    setContent {
-        WaveApp()
-    }
-}
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
 
-}
+        </activity>
 
-@Composable
-private fun WaveApp() {
-MaterialTheme {
-Surface(
-modifier = Modifier.fillMaxSize(),
-color = MaterialTheme.colorScheme.background
-) {
-Box(
-modifier = Modifier
-.fillMaxSize()
-.padding(24.dp),
-contentAlignment = Alignment.Center
-) {
-Column(
-horizontalAlignment = Alignment.CenterHorizontally,
-verticalArrangement = Arrangement.spacedBy(16.dp)
-) {
-Text(
-text = "WAVE",
-style = MaterialTheme.typography.headlineLarge
-)
+    </application>
 
-                Text(
-                    text = "Wave Live"
-                )
-
-                Button(
-                    onClick = {
-                        // سيتم ربط وظائف البث المباشر هنا لاحقًا
-                    }
-                ) {
-                    Text("ابدأ البث")
-                }
-            }
-        }
-    }
-}
-
-}
+</manifest>
