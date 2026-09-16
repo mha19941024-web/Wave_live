@@ -1556,10 +1556,3 @@ object Api {
                     key =
                         rtmps.optString("streamKey")
                 )
-
-            } finally {
-
-                connection.disconnect()
-            }
-        }
-}
