@@ -19,25 +19,36 @@ jobs:
 
       - name: Setup Java 17
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Check Android SDK
+      - name: Find Gradle wrapper
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls -la "$ANDROID_HOME"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version || true
+          echo "Project files:"
+          find . -maxdepth 4 -type f \( -name "gradlew" -o -name "settings.gradle" -o -name "settings.gradle.kts" \) -print
 
-      - name: Grant execute permission
-        run: chmod +x ./gradlew
+      - name: Build Wave
+        run: |
+          WRAPPER=$(find . -type f -name "gradlew" | head -n 1)
 
-      - name: Build APK
-        run: ./gradlew assembleDebug --stacktrace
+          if [ -z "$WRAPPER" ]; then
+            echo "ERROR: gradlew was not found."
+            echo "The Android project is incomplete or uploaded inside another folder."
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$WRAPPER")
+          echo "Gradle project found at: $PROJECT_DIR"
+
+          cd "$PROJECT_DIR"
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: Wave-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: "**/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
