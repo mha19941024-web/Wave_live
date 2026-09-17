@@ -1,1 +1,0 @@
-# VYRO release rules
