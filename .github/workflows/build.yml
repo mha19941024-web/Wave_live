@@ -1,13 +1,11 @@
 name: Build Wave APK
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-  workflow_dispatch:
-
-permissions:
-  contents: read
+      - master
 
 jobs:
   build:
@@ -15,40 +13,41 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v4
 
-      - name: Setup Java 17
-        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
-
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Find Gradle wrapper
-        run: |
-          echo "Project files:"
-          find . -maxdepth 4 -type f \( -name "gradlew" -o -name "settings.gradle" -o -name "settings.gradle.kts" \) -print
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Wave
+      - name: Find Android project
         run: |
-          WRAPPER=$(find . -type f -name "gradlew" | head -n 1)
+          echo "Searching for Gradle project..."
+          find . -maxdepth 4 -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \)
 
-          if [ -z "$WRAPPER" ]; then
-            echo "ERROR: gradlew was not found."
-            echo "The Android project is incomplete or uploaded inside another folder."
+      - name: Build APK
+        run: |
+          if [ -f "./build.gradle" ] || [ -f "./build.gradle.kts" ]; then
+            gradle assembleDebug
+          elif [ -f "./app/build.gradle" ] || [ -f "./app/build.gradle.kts" ]; then
+            gradle -p . assembleDebug
+          else
+            echo "ERROR: Android Gradle project not found."
             exit 1
           fi
 
-          PROJECT_DIR=$(dirname "$WRAPPER")
-          echo "Gradle project found at: $PROJECT_DIR"
-
-          cd "$PROJECT_DIR"
-          chmod +x ./gradlew
-          ./gradlew assembleDebug --stacktrace
+      - name: Find APK
+        run: |
+          echo "Searching for APK..."
+          find . -type f -name "*.apk" -print
 
       - name: Upload APK
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@v4
         with:
           name: Wave-debug-apk
-          path: "**/app/build/outputs/apk/debug/*.apk"
+          path: "**/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
