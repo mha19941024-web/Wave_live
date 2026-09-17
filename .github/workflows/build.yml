@@ -1,36 +1,48 @@
 name: Build Wave APK
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+  push:
+    branches: [ main, master ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d .git ]; then
+            git fetch --depth=1 origin "${GITHUB_SHA}"
+            git reset --hard "${GITHUB_SHA}"
+          else
+            git clone --depth=1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" .
+            git checkout "${GITHUB_SHA}"
+          fi
 
-      - name: Setup JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+      - name: Prepare Gradle
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.11.1-bin.zip -o /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp/gradle
+          echo "/tmp/gradle/gradle-8.11.1/bin" >> "$GITHUB_PATH"
+          gradle --version
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:assembleDebug --no-daemon --stacktrace
 
-      - name: Grant execute permission
-        run: chmod +x gradlew
-
-      - name: Build APK
-        run: ./gradlew assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Wave-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+      - name: Create release asset
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          TAG="wave-build-${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" "$APK" --repo "$GITHUB_REPOSITORY" --title "Wave APK build ${GITHUB_RUN_NUMBER}" --notes "Automated Wave debug APK build from ${GITHUB_SHA}." --target "$GITHUB_SHA"
