@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "842609295431",
+    "project_id": "wave-live-b285f",
+    "storage_bucket": "wave-live-b285f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:842609295431:android:922e64bfb9ce1dd5623162",
+        "android_client_info": {
+          "package_name": "Wava.live"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKLG4KbEC_NuRaV8NZb0yPdQ3g2uW3JF8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:842609295431:android:f065111131598d21623162",
+        "android_client_info": {
+          "package_name": "Wave.live"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKLG4KbEC_NuRaV8NZb0yPdQ3g2uW3JF8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
