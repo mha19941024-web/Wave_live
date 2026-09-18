@@ -1,513 +1,658 @@
 package com.vyro.app
 
-import android.content.Context
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val Bg = Color(0xFF08060D)
-private val Card = Color(0xFF15111D)
-private val Purple = Color(0xFF9B5CFF)
-private val Pink = Color(0xFFFF4FA3)
+private val WaveGreen = Color(0xFF19D36B)
+private val Dark = Color(0xFF0B0F0D)
+private val CardColor = Color(0xFF151B18)
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             WaveLiveApp()
         }
     }
 }
 
-@Composable
-fun WaveLiveApp() {
-    var started by remember { mutableStateOf(false) }
-
-    MaterialTheme(
-        colorScheme = darkColorScheme(
-            background = Bg,
-            surface = Card,
-            primary = Purple
-        )
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Bg
-        ) {
-            if (!started) {
-                Splash {
-                    started = true
-                }
-            } else {
-                MainScreen()
-            }
-        }
-    }
+private enum class Tab {
+    HOME,
+    LIVE,
+    CREATE,
+    INBOX,
+    PROFILE
 }
 
 @Composable
-fun Splash(onStart: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color(0xFF05030A),
-                        Color(0xFF160B22)
-                    )
-                )
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "WAVE",
-                fontSize = 54.sp,
-                fontWeight = FontWeight.Black,
-                color = Color.White
-            )
+private fun WaveLiveApp() {
 
-            Text(
-                text = "Wave Live",
-                color = Color.LightGray,
-                fontSize = 18.sp
-            )
-
-            Spacer(modifier = Modifier.height(34.dp))
-
-            Button(
-                onClick = onStart,
-                modifier = Modifier
-                    .width(220.dp)
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Purple
-                )
-            ) {
-                Text(
-                    "ابدأ الآن",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-enum class Tab(
-    val title: String,
-    val icon: String
-) {
-    FOR_YOU("لك", "⌂"),
-    LIVE("LIVE", "●"),
-    CREATE("إنشاء", "+"),
-    INBOX("الرسائل", "✉"),
-    PROFILE("حسابي", "●")
-}
-
-data class VideoItem(
-    val title: String,
-    val creator: String,
-    val uri: String? = null
-)
-
-@Composable
-fun MainScreen() {
-    val context = LocalContext.current
-
-    val prefs = remember {
-        context.getSharedPreferences(
-            "wave_user",
-            Context.MODE_PRIVATE
-        )
-    }
-
-    var tab by remember {
-        mutableStateOf(Tab.FOR_YOU)
-    }
-
-    var coins by remember {
-        mutableIntStateOf(
-            prefs.getInt("coins", 1200)
-        )
-    }
-
-    var earnings by remember {
-        mutableIntStateOf(
-            prefs.getInt("earnings", 0)
-        )
-    }
-
-    var loggedIn by remember {
-        mutableStateOf(
-            prefs.getBoolean("logged_in", false)
-        )
-    }
-
-    var userName by remember {
-        mutableStateOf(
-            prefs.getString("name", "") ?: ""
-        )
-    }
-
-    var userHandle by remember {
-        mutableStateOf(
-            prefs.getString("handle", "") ?: ""
-        )
-    }
-
-    var showWallet by remember {
+    var started by remember {
         mutableStateOf(false)
     }
 
-    val videos = remember {
-        mutableStateListOf(
-            VideoItem(
-                "أول فيديو على Wave Live",
-                "Wave Creator"
-            ),
-            VideoItem(
-                "استكشف الفيديوهات والبث المباشر",
-                "Wave Live"
-            ),
-            VideoItem(
-                "مرحبا بكم في Wave",
-                "Wave Team"
-            )
+    var selectedTab by remember {
+        mutableStateOf(Tab.HOME)
+    }
+
+    var coins by remember {
+        mutableIntStateOf(1250)
+    }
+
+    var earnings by remember {
+        mutableStateOf(0.0)
+    }
+
+    MaterialTheme(
+        colorScheme = darkColorScheme(
+            primary = WaveGreen,
+            background = Dark,
+            surface = CardColor,
+            onPrimary = Color.Black
         )
-    }
+    ) {
 
-    fun saveCoins(value: Int) {
-        coins = value
-        prefs.edit()
-            .putInt("coins", value)
-            .apply()
-    }
+        if (!started) {
 
-    fun saveEarnings(value: Int) {
-        earnings = value
-        prefs.edit()
-            .putInt("earnings", value)
-            .apply()
-    }
-
-    Scaffold(
-        containerColor = Bg,
-
-        bottomBar = {
-            NavigationBar(
-                containerColor = Color(0xFF0E0A14)
-            ) {
-                Tab.values().forEach { item ->
-
-                    NavigationBarItem(
-                        selected = tab == item,
-                        onClick = {
-                            tab = item
-                        },
-
-                        icon = {
-                            Text(
-                                item.icon,
-                                fontSize = 20.sp
-                            )
-                        },
-
-                        label = {
-                            Text(
-                                item.title,
-                                fontSize = 10.sp
-                            )
-                        },
-
-                        colors =
-                            NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.White,
-                                selectedTextColor = Color.White,
-                                indicatorColor =
-                                    Purple.copy(alpha = 0.35f),
-                                unselectedIconColor = Color.Gray,
-                                unselectedTextColor = Color.Gray
-                            )
-                    )
+            SplashScreen(
+                onStart = {
+                    started = true
                 }
-            }
-        }
-    ) { padding ->
+            )
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+        } else {
 
-            when (tab) {
+            Scaffold(
+                containerColor = Dark,
 
-                Tab.FOR_YOU -> {
-                    ForYouScreen(videos)
-                }
+                bottomBar = {
 
-                Tab.LIVE -> {
-                    LiveScreen(
-                        coins = coins,
+                    NavigationBar(
+                        containerColor = Color(0xFF101512)
+                    ) {
 
-                        onWallet = {
-                            showWallet = true
-                        },
-
-                        onGift = { price ->
-
-                            if (coins >= price) {
-
-                                saveCoins(
-                                    coins - price
-                                )
-
-                                saveEarnings(
-                                    earnings + price
-                                )
-                            }
+                        NavigationItem(
+                            label = "الرئيسية",
+                            icon = Icons.Default.Home,
+                            selected = selectedTab == Tab.HOME
+                        ) {
+                            selectedTab = Tab.HOME
                         }
-                    )
-                }
 
-                Tab.CREATE -> {
-                    CreatorCenter(
-                        loggedIn = loggedIn,
-
-                        onLogin = {
-                            tab = Tab.PROFILE
-                        },
-
-                        onVideoPublished = { video ->
-                            videos.add(0, video)
-                        },
-
-                        earnings = earnings,
-
-                        onWallet = {
-                            showWallet = true
+                        NavigationItem(
+                            label = "LIVE",
+                            icon = Icons.Default.Videocam,
+                            selected = selectedTab == Tab.LIVE
+                        ) {
+                            selectedTab = Tab.LIVE
                         }
-                    )
-                }
 
-                Tab.INBOX -> {
-                    InboxScreen()
-                }
-
-                Tab.PROFILE -> {
-                    ProfileScreen(
-                        loggedIn = loggedIn,
-                        name = userName,
-                        handle = userHandle,
-                        earnings = earnings,
-
-                        onRegister = { name, handle ->
-
-                            userName = name
-                            userHandle = handle
-                            loggedIn = true
-
-                            prefs.edit()
-                                .putBoolean(
-                                    "logged_in",
-                                    true
-                                )
-                                .putString(
-                                    "name",
-                                    name
-                                )
-                                .putString(
-                                    "handle",
-                                    handle
-                                )
-                                .apply()
-                        },
-
-                        onLogout = {
-
-                            loggedIn = false
-                            userName = ""
-                            userHandle = ""
-
-                            prefs.edit()
-                                .clear()
-                                .apply()
-
-                            coins = 1200
-                            earnings = 0
-                        },
-
-                        onCreatorWallet = {
-                            tab = Tab.CREATE
+                        NavigationItem(
+                            label = "إنشاء",
+                            icon = Icons.Default.AddCircle,
+                            selected = selectedTab == Tab.CREATE
+                        ) {
+                            selectedTab = Tab.CREATE
                         }
-                    )
-                }
-            }
 
-            if (showWallet) {
+                        NavigationItem(
+                            label = "الوارد",
+                            icon = Icons.Default.Notifications,
+                            selected = selectedTab == Tab.INBOX
+                        ) {
+                            selectedTab = Tab.INBOX
+                        }
 
-                WalletDialog(
-                    coins = coins,
-
-                    onClose = {
-                        showWallet = false
-                    },
-
-                    onAdd = { amount ->
-
-                        saveCoins(
-                            coins + amount
-                        )
-
-                        showWallet = false
+                        NavigationItem(
+                            label = "لك",
+                            icon = Icons.Default.Person,
+                            selected = selectedTab == Tab.PROFILE
+                        ) {
+                            selectedTab = Tab.PROFILE
+                        }
                     }
-                )
+                }
+
+            ) { paddingValues ->
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
+
+                    when (selectedTab) {
+
+                        Tab.HOME -> {
+                            HomeScreen(coins)
+                        }
+
+                        Tab.LIVE -> {
+                            LiveScreen()
+                        }
+
+                        Tab.CREATE -> {
+                            CreateScreen(
+                                onCreatorReward = {
+                                    earnings += 5.0
+                                }
+                            )
+                        }
+
+                        Tab.INBOX -> {
+                            InboxScreen()
+                        }
+
+                        Tab.PROFILE -> {
+                            ProfileScreen(
+                                coins = coins,
+                                earnings = earnings,
+                                onAddCoins = {
+                                    coins += 500
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun ForYouScreen(
-    videos: List<VideoItem>
+private fun SplashScreen(
+    onStart: () -> Unit
 ) {
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Dark)
+            .padding(28.dp),
+
+        horizontalAlignment = Alignment.CenterHorizontally,
+
+        verticalArrangement = Arrangement.Center
+    ) {
+
+        Text(
+            text = "WAVE",
+            color = WaveGreen,
+            fontSize = 48.sp,
+            fontWeight = FontWeight.Black
+        )
+
+        Spacer(
+            modifier = Modifier.height(6.dp)
+        )
+
+        Text(
+            text = "Wave Live",
+            color = Color.White,
+            fontSize = 22.sp
+        )
+
+        Spacer(
+            modifier = Modifier.height(34.dp)
+        )
+
+        Button(
+            onClick = onStart,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+
+            Text(
+                text = "ابدأ الآن",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun NavigationItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+
+    NavigationBarItem(
+
+        selected = selected,
+
+        onClick = onClick,
+
+        icon = {
+            androidx.compose.material3.Icon(
+                imageVector = icon,
+                contentDescription = label
+            )
+        },
+
+        label = {
+            Text(
+                text = label,
+                fontSize = 11.sp
+            )
+        },
+
+        colors = NavigationBarItemDefaults.colors(
+            selectedIconColor = WaveGreen,
+            selectedTextColor = WaveGreen,
+            unselectedIconColor = Color.LightGray,
+            unselectedTextColor = Color.LightGray,
+            indicatorColor = Color.Transparent
+        )
+    )
+}
+
+@Composable
+private fun HomeScreen(
+    coins: Int
+) {
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Bg),
+            .padding(horizontal = 16.dp),
 
-        contentPadding = PaddingValues(16.dp),
-
-        verticalArrangement =
-            Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
 
         item {
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 18.dp),
 
-                horizontalArrangement =
-                    Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.SpaceBetween,
 
-                verticalAlignment =
-                    Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically
             ) {
 
                 Column {
 
                     Text(
-                        "Wave Live",
+                        text = "Wave Live",
+                        color = WaveGreen,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Black
                     )
 
                     Text(
-                        "لك • فيديوهات وبث مباشر",
-                        color = Color.Gray
+                        text = "شاهد، تفاعل، واصنع محتواك",
+                        color = Color.LightGray
                     )
                 }
 
-                Text(
-                    "FOR YOU",
-                    color = Pink,
-                    fontWeight = FontWeight.Bold
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        Text("🪙 $coins")
+                    }
                 )
             }
         }
 
-        items(videos) { video ->
+        item {
 
-            VideoCard(video)
+            Text(
+                text = "مباشر الآن",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+
+                items(
+                    listOf(
+                        "سارة",
+                        "محمد",
+                        "نور",
+                        "أحمد"
+                    )
+                ) { name ->
+
+                    LiveCard(name)
+                }
+            }
+        }
+
+        item {
+
+            Text(
+                text = "فيديوهات مقترحة",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        items(
+            listOf(
+                "فيديو جديد من Wave",
+                "رحلة اليوم",
+                "تحدي Wave",
+                "محتوى المبدعين"
+            )
+        ) { title ->
+
+            VideoCard(title)
         }
     }
 }
 
 @Composable
-fun VideoCard(
-    video: VideoItem
+private fun LiveCard(
+    name: String
 ) {
-    Column(
+
+    Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(Card)
+            .width(150.dp)
+            .height(120.dp),
+
+        colors = CardDefaults.cardColors(
+            containerColor = CardColor
+        )
     ) {
 
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(330.dp)
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            Color(0xFF32164A),
-                            Color(0xFF0B0810)
-                        )
-                    )
-                ),
+                .fillMaxSize()
+                .background(Color(0xFF202722)),
 
-            contentAlignment =
-                Alignment.Center
+            contentAlignment = Alignment.Center
         ) {
 
-            Text(
-                "WAVE VIDEO",
-                color = Color.Gray,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .background(
+                            WaveGreen,
+                            CircleShape
+                        ),
+
+                    contentAlignment = Alignment.Center
+                ) {
+
+                    Text(
+                        text = name.take(1),
+                        color = Color.Black,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Text(
+                    text = name,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    text = "🔴 LIVE",
+                    color = Color.Red,
+                    fontSize = 12.sp
+                )
+            }
         }
+    }
+}
 
-        Row(
+@Composable
+private fun VideoCard(
+    title: String
+) {
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp),
+
+        colors = CardDefaults.cardColors(
+            containerColor = CardColor
+        )
+    ) {
+
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
+                .fillMaxSize()
+                .padding(16.dp),
 
-            verticalAlignment =
-                Alignment.CenterVertically
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
 
             Box(
                 modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
+                    .fillMaxWidth()
+                    .weight(1f)
                     .background(
-                        Brush.linearGradient(
-                            listOf(Purple, Pink)
-                        )
-                    )
+                        Color(0xFF202722),
+                        RoundedCornerShape(14.dp)
+                    ),
+
+                contentAlignment = Alignment.Center
+            ) {
+
+                Text(
+                    text = "▶",
+                    color = WaveGreen,
+                    fontSize = 42.sp
+                )
+            }
+
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
+
+            Text(
+                text = title,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun LiveScreen() {
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(18.dp)
+    ) {
+
+        Text(
+            text = "البث المباشر",
+            color = WaveGreen,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Black
+        )
+
+        Spacer(
+            modifier = Modifier.height(18.dp)
+        )
+
+        ActionCard(
+            icon = "🔴",
+            title = "ابدأ بثك الآن",
+            subtitle = "شارك جمهورك وابدأ في بناء مجتمعك على Wave Live"
+        ) {}
+
+        Spacer(
+            modifier = Modifier.height(16.dp)
+        )
+
+        Text(
+            text = "البثوث المقترحة",
+            color = Color.White,
+            fontSize = 19.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(
+            modifier = Modifier.height(10.dp)
+        )
+
+        LiveCard("Wave")
+    }
+}
+
+@Composable
+private fun CreateScreen(
+    onCreatorReward: () -> Unit
+) {
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(18.dp)
+    ) {
+
+        Text(
+            text = "إنشاء",
+            color = WaveGreen,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Black
+        )
+
+        Spacer(
+            modifier = Modifier.height(18.dp)
+        )
+
+        ActionCard(
+            icon = "📹",
+            title = "رفع فيديو",
+            subtitle = "اختر فيديو من جهازك وانشره على Wave Live"
+        ) {}
+
+        Spacer(
+            modifier = Modifier.height(12.dp)
+        )
+
+        ActionCard(
+            icon = "🔴",
+            title = "بدء بث مباشر",
+            subtitle = "ابدأ بثاً جديداً وتفاعل مع المتابعين"
+        ) {}
+
+        Spacer(
+            modifier = Modifier.height(12.dp)
+        )
+
+        ActionCard(
+            icon = "💰",
+            title = "مركز المبدع",
+            subtitle = "تابع أرباحك ومكافآتك"
+        ) {
+            onCreatorReward()
+        }
+    }
+}
+
+@Composable
+private fun ActionCard(
+    icon: String,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                onClick()
+            },
+
+        colors = CardDefaults.cardColors(
+            containerColor = CardColor
+        )
+    ) {
+
+        Row(
+            modifier = Modifier.padding(18.dp),
+
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            Text(
+                text = icon,
+                fontSize = 34.sp
             )
 
             Spacer(
-                modifier = Modifier.width(12.dp)
+                modifier = Modifier.width(14.dp)
             )
 
             Column(
@@ -515,469 +660,217 @@ fun VideoCard(
             ) {
 
                 Text(
-                    video.creator,
+                    text = title,
+                    color = Color.White,
+                    fontSize = 19.sp,
                     fontWeight = FontWeight.Bold
                 )
 
                 Text(
-                    video.title,
-                    color = Color.LightGray,
-                    fontSize = 13.sp
+                    text = subtitle,
+                    color = Color.LightGray
                 )
             }
 
-            Column(
-                horizontalAlignment =
-                    Alignment.CenterHorizontally
-            ) {
-
-                Text(
-                    "♡",
-                    fontSize = 26.sp
-                )
-
-                Text(
-                    "إعجاب",
-                    fontSize = 10.sp,
-                    color = Color.Gray
-                )
-            }
+            androidx.compose.material3.Icon(
+                imageVector = Icons.Default.ChevronLeft,
+                contentDescription = null,
+                tint = WaveGreen
+            )
         }
     }
 }
 
 @Composable
-fun LiveScreen(
-    coins: Int,
-    onWallet: () -> Unit,
-    onGift: (Int) -> Unit
-) {
-    var selectedGift by remember {
-        mutableStateOf<String?>(null)
-    }
+private fun InboxScreen() {
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF100B18))
+            .padding(18.dp)
+    ) {
+
+        Text(
+            text = "الوارد",
+            color = WaveGreen,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Black
+        )
+
+        Spacer(
+            modifier = Modifier.height(20.dp)
+        )
+
+        ActionCard(
+            icon = "🔔",
+            title = "الإشعارات",
+            subtitle = "إشعارات المتابعين والبثوث والهدايا"
+        ) {}
+
+        Spacer(
+            modifier = Modifier.height(12.dp)
+        )
+
+        ActionCard(
+            icon = "🎁",
+            title = "الهدايا",
+            subtitle = "تابع الهدايا التي استلمتها أثناء البث"
+        ) {}
+    }
+}
+
+@Composable
+private fun ProfileScreen(
+    coins: Int,
+    earnings: Double,
+    onAddCoins: () -> Unit
+) {
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
             .padding(18.dp)
     ) {
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
-
-            horizontalArrangement =
-                Arrangement.SpaceBetween,
-
-            verticalAlignment =
-                Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically
         ) {
+
+            Box(
+                modifier = Modifier
+                    .size(76.dp)
+                    .background(
+                        WaveGreen,
+                        CircleShape
+                    ),
+
+                contentAlignment = Alignment.Center
+            ) {
+
+                androidx.compose.material3.Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    tint = Color.Black,
+                    modifier = Modifier.size(42.dp)
+                )
+            }
+
+            Spacer(
+                modifier = Modifier.width(14.dp)
+            )
 
             Column {
 
                 Text(
-                    "LIVE",
-                    color = Pink,
-                    fontWeight = FontWeight.Black
-                )
-
-                Text(
-                    "Wave Live",
+                    text = "مستخدم Wave",
+                    color = Color.White,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold
                 )
-            }
-
-            OutlinedButton(
-                onClick = onWallet
-            ) {
-                Text("🪙 $coins")
-            }
-        }
-
-        Spacer(
-            modifier = Modifier.height(18.dp)
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .clip(RoundedCornerShape(24.dp))
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            Color(0xFF29163D),
-                            Color(0xFF0B0810)
-                        )
-                    )
-                ),
-
-            contentAlignment =
-                Alignment.Center
-        ) {
-
-            Column(
-                horizontalAlignment =
-                    Alignment.CenterHorizontally
-            ) {
 
                 Text(
-                    "🔴",
-                    fontSize = 38.sp
-                )
-
-                Text(
-                    "LIVE VIDEO",
-                    color = Color.Gray,
-                    fontSize = 22.sp
-                )
-
-                Text(
-                    "البث المباشر",
-                    color = Color.DarkGray
+                    text = "@wave_creator",
+                    color = Color.LightGray
                 )
             }
         }
 
         Spacer(
-            modifier = Modifier.height(14.dp)
-        )
-
-        Text(
-            "🎁 أرسل هدية",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp
-        )
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        val gifts = listOf(
-            "👑" to ("تاج Wave" to 100),
-            "💎" to ("ألماسة" to 250),
-            "🚀" to ("صاروخ" to 500),
-            "🌟" to ("نجمة" to 1000)
-        )
-
-        LazyRow(
-            horizontalArrangement =
-                Arrangement.spacedBy(10.dp)
-        ) {
-
-            items(gifts) { item ->
-
-                val emoji = item.first
-                val name = item.second.first
-                val price = item.second.second
-
-                Column(
-                    modifier = Modifier
-                        .width(84.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Card)
-                        .clickable {
-
-                            selectedGift = name
-
-                            onGift(price)
-                        }
-                        .padding(10.dp),
-
-                    horizontalAlignment =
-                        Alignment.CenterHorizontally
-                ) {
-
-                    Text(
-                        emoji,
-                        fontSize = 34.sp
-                    )
-
-                    Text(
-                        name,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Text(
-                        "$price 🪙",
-                        fontSize = 11.sp,
-                        color = Purple
-                    )
-                }
-            }
-        }
-
-        if (selectedGift != null) {
-
-            Text(
-                "تم إرسال $selectedGift",
-                color = Purple,
-                modifier = Modifier.padding(
-                    top = 8.dp
-                )
-            )
-        }
-    }
-}
-
-@Composable
-fun CreatorCenter(
-    loggedIn: Boolean,
-    onLogin: () -> Unit,
-    onVideoPublished: (VideoItem) -> Unit,
-    earnings: Int,
-    onWallet: () -> Unit
-) {
-    if (!loggedIn) {
-
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-
-            Column(
-                horizontalAlignment =
-                    Alignment.CenterHorizontally,
-
-                modifier = Modifier.padding(24.dp)
-            ) {
-
-                Text(
-                    "لوحة المبدع",
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(
-                    modifier = Modifier.height(10.dp)
-                )
-
-                Text(
-                    "أنشئ حسابًا أولًا لرفع الفيديوهات وإدارة الأرباح.",
-                    color = Color.Gray
-                )
-
-                Spacer(
-                    modifier = Modifier.height(24.dp)
-                )
-
-                Button(
-                    onClick = onLogin
-                ) {
-                    Text("إضافة حساب")
-                }
-            }
-        }
-
-        return
-    }
-
-    var showUpload by remember {
-        mutableStateOf(false)
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp)
-    ) {
-
-        Text(
-            "لوحة المبدع",
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Black
-        )
-
-        Text(
-            "إدارة المحتوى والأرباح",
-            color = Color.Gray
-        )
-
-        Spacer(
-            modifier = Modifier.height(20.dp)
+            modifier = Modifier.height(24.dp)
         )
 
         Row(
-            horizontalArrangement =
-                Arrangement.spacedBy(10.dp)
+            modifier = Modifier.fillMaxWidth(),
+
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
 
-            CreatorStat(
-                "💰",
-                "الأرباح",
-                earnings.toString()
+            StatCard(
+                icon = "🪙",
+                value = coins.toString(),
+                label = "Coins",
+                modifier = Modifier.weight(1f)
             )
 
-            CreatorStat(
-                "🎬",
-                "المحتوى",
-                "Wave"
+            StatCard(
+                icon = "💰",
+                value = String.format("%.2f", earnings),
+                label = "الأرباح",
+                modifier = Modifier.weight(1f)
             )
         }
 
         Spacer(
-            modifier = Modifier.height(20.dp)
+            modifier = Modifier.height(16.dp)
         )
 
-        Button(
-            onClick = {
-                showUpload = true
-            },
+        ActionCard(
+            icon = "👤",
+            title = "إضافة / تعديل الحساب",
+            subtitle = "أكمل بيانات ملفك الشخصي"
+        ) {}
 
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
+        Spacer(
+            modifier = Modifier.height(12.dp)
+        )
 
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Purple
-            )
+        ActionCard(
+            icon = "🪙",
+            title = "شحن Wave Coins",
+            subtitle = "إضافة رصيد Coins"
         ) {
-            Text(
-                "🎥 رفع فيديو",
-                fontWeight = FontWeight.Bold
-            )
+            onAddCoins()
         }
 
         Spacer(
             modifier = Modifier.height(12.dp)
         )
 
-        OutlinedButton(
-            onClick = onWallet,
+        ActionCard(
+            icon = "💳",
+            title = "محفظة المبدع",
+            subtitle = "الأرباح وطلبات السحب"
+        ) {}
+    }
+}
 
+@Composable
+private fun StatCard(
+    icon: String,
+    value: String,
+    label: String,
+    modifier: Modifier
+) {
+
+    Card(
+        modifier = modifier.height(105.dp),
+
+        colors = CardDefaults.cardColors(
+            containerColor = CardColor
+        )
+    ) {
+
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp)
+                .fillMaxSize()
+                .padding(12.dp),
+
+            horizontalAlignment = Alignment.CenterHorizontally,
+
+            verticalArrangement = Arrangement.Center
         ) {
-            Text("💰 محفظة أرباح المبدع")
-        }
 
-        if (showUpload) {
+            Text(
+                text = "$icon $value",
+                color = WaveGreen,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
 
-            UploadVideoDialog(
-                onClose = {
-                    showUpload = false
-                },
-
-                onPublish = { video ->
-
-                    onVideoPublished(video)
-
-                    showUpload = false
-                }
+            Text(
+                text = label,
+                color = Color.LightGray
             )
         }
     }
 }
-
-@Composable
-fun CreatorStat(
-    icon: String,
-    title: String,
-    value: String
-) {
-    Column(
-        modifier = Modifier
-            .weight(1f)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Card)
-            .padding(16.dp)
-    ) {
-
-        Text(
-            icon,
-            fontSize = 25.sp
-        )
-
-        Text(
-            title,
-            color = Color.Gray,
-            fontSize = 12.sp
-        )
-
-        Text(
-            value,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
-fun UploadVideoDialog(
-    onClose: () -> Unit,
-    onPublish: (VideoItem) -> Unit
-) {
-    val context = LocalContext.current
-
-    var selectedUri by remember {
-        mutableStateOf<Uri?>(null)
-    }
-
-    var title by remember {
-        mutableStateOf("")
-    }
-
-    val picker =
-        rememberLauncherForActivityResult(
-            ActivityResultContracts.GetContent()
-        ) { uri ->
-
-            selectedUri = uri
-        }
-
-    AlertDialog(
-        onDismissRequest = onClose,
-
-        title = {
-            Text("رفع فيديو")
-        },
-
-        text = {
-
-            Column {
-
-                Button(
-                    onClick = {
-                        picker.launch("video/*")
-                    },
-
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-
-                    Text(
-                        if (selectedUri == null)
-                            "اختيار فيديو من الهاتف"
-                        else
-                            "تم اختيار الفيديو ✓"
-                    )
-                }
-
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
-
-                OutlinedTextField(
-                    value = title,
-
-                    onValueChange = {
-                        title = it
-                    },
-
-                    modifier = Modifier.fillMaxWidth(),
-
-                    label = {
-                        Text("عنوان الفيديو")
-                    },
-
-                    singleLine = true
-                )
-
-                Spacer(
-                    modifier = Modifier.height(8.dp)
-                )
-
-                Text(
-                    "سي
