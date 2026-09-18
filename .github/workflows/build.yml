@@ -15,32 +15,44 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
 
       - name: Set up Java 17
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        uses: actions/setup-java@3a4f6a8c3b2b3b8e5f4c1a9d2c7e6f5b4a3c2d1e
         with:
           distribution: temurin
           java-version: '17'
 
+      - name: Check project
+        run: |
+          set -euo pipefail
+          echo "Checking Wave project..."
+          test -f settings.gradle || test -f settings.gradle.kts
+          test -f app/build.gradle || test -f app/build.gradle.kts
+          echo "Project files found."
+
       - name: Install Gradle
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y gradle
 
-      - name: Generate Gradle Wrapper
-        run: |
-          gradle wrapper --gradle-version 8.13 --distribution-type bin
-
-      - name: Make Gradle executable
-        run: chmod +x gradlew
-
       - name: Build APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          set -euo pipefail
+          gradle --version
+          gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Find APK
+        run: |
+          set -euo pipefail
+          echo "Searching for APK..."
+          find . -type f -name "*.apk" -print
+          test -n "$(find . -type f -name "*.apk" -print -quit)"
 
       - name: Upload APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a0
+        uses: actions/upload-artifact@v4.6.2
         with:
-          name: Wave-Live-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: Wave-Live-APK
+          path: app/build/outputs/apk/**/*.apk
           if-no-files-found: error
