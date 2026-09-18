@@ -1,31 +1,45 @@
 name: Build Wave APK
-'on':
-workflow_dispatch:
-push:
-branches:
-- main
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
-build:
-runs-on: ubuntu-latest
-steps:
-- uses: actions/checkout@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+  build:
+    runs-on: ubuntu-latest
 
-  - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
-    with:
-      distribution: temurin
-      java-version: '17'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
 
-  - name: Install Gradle
-    run: sudo apt-get update && sudo apt-get install -y gradle
+      - name: Set up Java 17
+        uses: actions/setup-java@0f7e5a5b6f2d7f8c5c7f5c0e4e5c5d6c7b8a9d0e
+        with:
+          distribution: temurin
+          java-version: '17'
 
-  - name: Create Wrapper
-    run: gradle wrapper --gradle-version 8.13 --distribution-type bin
+      - name: Install Gradle
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gradle
 
-  - name: Build APK
-    run: ./gradlew assembleDebug --stacktrace
+      - name: Generate Gradle Wrapper
+        run: |
+          gradle wrapper --gradle-version 8.13 --distribution-type bin
 
-  - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-    with:
-      name: Wave-Live-debug
-      path: app/build/outputs/apk/debug/*.apk
+      - name: Make Gradle executable
+        run: chmod +x gradlew
+
+      - name: Build APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Wave-Live-debug
+          path: app/build/outputs/apk/debug/*.apk
