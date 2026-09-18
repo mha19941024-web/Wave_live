@@ -5,652 +5,219 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+private val Bg = Color(0xFF08060D)
+private val Card = Color(0xFF15111D)
+private val Purple = Color(0xFF9B5CFF)
+private val Pink = Color(0xFFFF4FA3)
+
 class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent { WaveLiveApp() }
+    }
+}
 
-override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-
-    setContent {
-        MaterialTheme {
-            WaveApp()
+@Composable
+fun WaveLiveApp() {
+    var started by remember { mutableStateOf(false) }
+    MaterialTheme(colorScheme = darkColorScheme(background = Bg, surface = Card, primary = Purple)) {
+        Surface(Modifier.fillMaxSize(), color = Bg) {
+            if (!started) Splash { started = true } else MainScreen()
         }
     }
 }
 
+@Composable
+fun Splash(onStart: () -> Unit) {
+    Box(
+        Modifier.fillMaxSize().background(
+            Brush.verticalGradient(listOf(Color(0xFF05030A), Color(0xFF160B22)))
+        ),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("WAVE", fontSize = 52.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text("Wave Live", color = Color.LightGray, fontSize = 18.sp)
+            Spacer(Modifier.height(36.dp))
+            Button(
+                onClick = onStart,
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Purple),
+                modifier = Modifier.width(210.dp).height(54.dp)
+            ) { Text("Start Live", fontSize = 17.sp, fontWeight = FontWeight.Bold) }
+        }
+    }
 }
 
-@androidx.compose.runtime.Composable
-fun WaveApp() {
-
-var selectedTab by remember {
-    mutableIntStateOf(0)
+enum class Tab(val title: String, val icon: String) {
+    HOME("Home", "⌂"), LIVE("LIVE", "●"), CREATE("Create", "+"), INBOX("Inbox", "✉"), PROFILE("Profile", "●")
 }
 
-val tabs = listOf(
-    "Home",
-    "LIVE",
-    "Create",
-    "Inbox",
-    "Profile"
-)
+@Composable
+fun MainScreen() {
+    var tab by remember { mutableStateOf(Tab.LIVE) }
+    var coins by remember { mutableIntStateOf(1200) }
+    var showWallet by remember { mutableStateOf(false) }
 
-Scaffold(
-    containerColor = Color(0xFF08080D),
-    bottomBar = {
-        NavigationBar(
-            containerColor = Color(0xFF111116)
-        ) {
-            tabs.forEachIndexed { index, title ->
-
-                val icon = when (index) {
-                    0 -> Icons.Default.Home
-                    1 -> Icons.Default.PlayArrow
-                    2 -> Icons.Default.Add
-                    3 -> Icons.Default.Mail
-                    else -> Icons.Default.Person
-                }
-
-                NavigationBarItem(
-                    selected = selectedTab == index,
-                    onClick = {
-                        selectedTab = index
-                    },
-                    icon = {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = title
+    Scaffold(
+        containerColor = Bg,
+        bottomBar = {
+            NavigationBar(containerColor = Color(0xFF0E0A14)) {
+                Tab.values().forEach { item ->
+                    NavigationBarItem(
+                        selected = tab == item,
+                        onClick = { tab = item },
+                        icon = { Text(item.icon, fontSize = 20.sp) },
+                        label = { Text(item.title, fontSize = 11.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Color.White,
+                            selectedTextColor = Color.White,
+                            indicatorColor = Purple.copy(alpha = .35f),
+                            unselectedIconColor = Color.Gray,
+                            unselectedTextColor = Color.Gray
                         )
-                    },
-                    label = {
-                        Text(title)
-                    }
-                )
+                    )
+                }
             }
         }
-    }
-) { padding ->
-
-    when (selectedTab) {
-
-        0 -> HomeScreen(
-            modifier = Modifier.padding(padding)
-        )
-
-        1 -> LiveScreen(
-            modifier = Modifier.padding(padding)
-        )
-
-        2 -> CreateScreen(
-            modifier = Modifier.padding(padding)
-        )
-
-        3 -> InboxScreen(
-            modifier = Modifier.padding(padding)
-        )
-
-        4 -> ProfileScreen(
-            modifier = Modifier.padding(padding)
-        )
-    }
-}
-
-}
-
-@androidx.compose.runtime.Composable
-fun HomeScreen(
-modifier: Modifier = Modifier
-) {
-
-Column(
-    modifier = modifier
-        .fillMaxSize()
-        .background(Color(0xFF08080D))
-        .padding(16.dp)
-) {
-
-    Text(
-        text = "WAVE",
-        color = Color.White,
-        fontSize = 30.sp,
-        fontWeight = FontWeight.ExtraBold
-    )
-
-    Text(
-        text = "Wave Live",
-        color = Color(0xFFB98CFF),
-        fontSize = 15.sp
-    )
-
-    Spacer(modifier = Modifier.height(20.dp))
-
-    Text(
-        text = "Live Now",
-        color = Color.White,
-        fontSize = 21.sp,
-        fontWeight = FontWeight.Bold
-    )
-
-    Spacer(modifier = Modifier.height(12.dp))
-
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-
-        items(
-            listOf(
-                "LIVE 01",
-                "LIVE 02",
-                "LIVE 03",
-                "LIVE 04"
-            )
-        ) { title ->
-
-            LiveCard(title)
+    ) { pad ->
+        Box(Modifier.fillMaxSize().padding(pad)) {
+            when (tab) {
+                Tab.HOME -> HomeScreen()
+                Tab.LIVE -> LiveScreen(coins, onWallet = { showWallet = true }, onGift = { if (coins >= it) coins -= it })
+                Tab.CREATE -> CreateScreen()
+                Tab.INBOX -> CenterMessage("INBOX", "Notifications coming soon")
+                Tab.PROFILE -> CenterMessage("PROFILE", "Your Wave profile")
+            }
+            if (showWallet) WalletDialog(coins, onClose = { showWallet = false }, onAdd = { coins += it })
         }
     }
+}
 
-    Spacer(modifier = Modifier.height(28.dp))
-
-    Text(
-        text = "Popular Rooms",
-        color = Color.White,
-        fontSize = 21.sp,
-        fontWeight = FontWeight.Bold
-    )
-
-    Spacer(modifier = Modifier.height(12.dp))
-
-    repeat(3) { index ->
-
-        RoomItem(
-            title = "Wave Room ${index + 1}",
-            viewers = "${(index + 1) * 125} viewers"
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
+@Composable
+fun HomeScreen() {
+    Column(Modifier.fillMaxSize().padding(20.dp)) {
+        Text("Wave Live", fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Text("Discover live creators", color = Color.Gray)
+        Spacer(Modifier.height(24.dp))
+        Text("Trending", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(12.dp))
+        repeat(4) { LiveCard("Creator ${it + 1}") }
     }
 }
 
-}
-
-@androidx.compose.runtime.Composable
-fun LiveCard(
-title: String
-) {
-
-Box(
-    modifier = Modifier
-        .size(width = 145.dp, height = 190.dp)
-        .clip(RoundedCornerShape(18.dp))
-        .background(
-            Brush.verticalGradient(
-                listOf(
-                    Color(0xFF7A3FFF),
-                    Color(0xFF15151D)
-                )
-            )
-        )
-        .clickable { },
-    contentAlignment = Alignment.BottomStart
-) {
-
-    Column(
-        modifier = Modifier.padding(12.dp)
-    ) {
-
-        Text(
-            text = "● LIVE",
-            color = Color.White,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = title,
-            color = Color.White,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-}
-
-@androidx.compose.runtime.Composable
-fun RoomItem(
-title: String,
-viewers: String
-) {
-
-Surface(
-    modifier = Modifier.fillMaxWidth(),
-    color = Color(0xFF15151D),
-    shape = RoundedCornerShape(16.dp)
-) {
-
+@Composable
+fun LiveCard(name: String) {
     Row(
-        modifier = Modifier.padding(14.dp),
+        Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(18.dp))
+            .background(Card).padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-
-        Box(
-            modifier = Modifier
-                .size(55.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF713DFF)),
-            contentAlignment = Alignment.Center
-        ) {
-
-            Text(
-                text = "W",
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Spacer(modifier = Modifier.size(12.dp))
-
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-
-            Text(
-                text = title,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
-            )
-
-            Text(
-                text = viewers,
-                color = Color.Gray,
-                fontSize = 13.sp
-            )
-        }
-
-        Text(
-            text = "LIVE",
-            color = Color(0xFFFF4F7B),
-            fontWeight = FontWeight.Bold
-        )
+        Box(Modifier.size(48.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Purple, Pink))))
+        Spacer(Modifier.width(12.dp))
+        Column { Text(name, fontWeight = FontWeight.Bold); Text("LIVE now", color = Pink, fontSize = 12.sp) }
     }
 }
 
-}
-
-@androidx.compose.runtime.Composable
-fun LiveScreen(
-modifier: Modifier = Modifier
-) {
-
-Column(
-    modifier = modifier
-        .fillMaxSize()
-        .background(Color(0xFF08080D))
-        .padding(20.dp),
-    horizontalAlignment = Alignment.CenterHorizontally
-) {
-
-    Spacer(modifier = Modifier.height(30.dp))
-
-    Text(
-        text = "WAVE LIVE",
-        color = Color.White,
-        fontSize = 30.sp,
-        fontWeight = FontWeight.ExtraBold
-    )
-
-    Spacer(modifier = Modifier.height(35.dp))
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(390.dp)
-            .clip(RoundedCornerShape(22.dp))
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color(0xFF32146B),
-                        Color(0xFF101017)
-                    )
-                )
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-
-            Box(
-                modifier = Modifier
-                    .size(90.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF713DFF)),
-                contentAlignment = Alignment.Center
-            ) {
-
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "Live",
-                    tint = Color.White,
-                    modifier = Modifier.size(48.dp)
-                )
+@Composable
+fun LiveScreen(coins: Int, onWallet: () -> Unit, onGift: (Int) -> Unit) {
+    var selectedGift by remember { mutableStateOf<String?>(null) }
+    Box(Modifier.fillMaxSize().background(Color(0xFF100B18))) {
+        Column(Modifier.fillMaxSize().padding(18.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column { Text("LIVE", color = Pink, fontWeight = FontWeight.Black, fontSize = 14.sp); Text("Wave Creator", fontSize = 22.sp, fontWeight = FontWeight.Bold) }
+                OutlinedButton(onClick = onWallet) { Text("🪙 $coins") }
             }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Text(
-                text = "Live streams will appear here",
-                color = Color.White,
-                fontSize = 17.sp,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-
-    Spacer(modifier = Modifier.height(20.dp))
-
-    Button(
-        onClick = { },
-        modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF713DFF)
-        ),
-        shape = RoundedCornerShape(15.dp)
-    ) {
-
-        Text(
-            text = "Start Watching",
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-}
-
-@androidx.compose.runtime.Composable
-fun CreateScreen(
-modifier: Modifier = Modifier
-) {
-
-Column(
-    modifier = modifier
-        .fillMaxSize()
-        .background(Color(0xFF08080D))
-        .padding(20.dp),
-    horizontalAlignment = Alignment.CenterHorizontally
-) {
-
-    Spacer(modifier = Modifier.height(45.dp))
-
-    Text(
-        text = "Create Live",
-        color = Color.White,
-        fontSize = 30.sp,
-        fontWeight = FontWeight.Bold
-    )
-
-    Spacer(modifier = Modifier.height(25.dp))
-
-    Text(
-        text = "ابدأ البث المباشر على Wave",
-        color = Color.LightGray,
-        fontSize = 17.sp,
-        textAlign = TextAlign.Center
-    )
-
-    Spacer(modifier = Modifier.height(35.dp))
-
-    Button(
-        onClick = { },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(58.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF713DFF)
-        ),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-
-        Icon(
-            imageVector = Icons.Default.PlayArrow,
-            contentDescription = null
-        )
-
-        Spacer(modifier = Modifier.size(8.dp))
-
-        Text(
-            text = "Start Live",
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-}
-
-@androidx.compose.runtime.Composable
-fun InboxScreen(
-modifier: Modifier = Modifier
-) {
-
-Column(
-    modifier = modifier
-        .fillMaxSize()
-        .background(Color(0xFF08080D))
-        .padding(20.dp)
-) {
-
-    Text(
-        text = "Inbox",
-        color = Color.White,
-        fontSize = 30.sp,
-        fontWeight = FontWeight.Bold
-    )
-
-    Spacer(modifier = Modifier.height(30.dp))
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFF15151D),
-        shape = RoundedCornerShape(18.dp)
-    ) {
-
-        Column(
-            modifier = Modifier.padding(22.dp)
-        ) {
-
-            Icon(
-                imageVector = Icons.Default.Mail,
-                contentDescription = null,
-                tint = Color(0xFFB98CFF),
-                modifier = Modifier.size(42.dp)
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "Notifications",
-                color = Color.White,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                text = "الإشعارات والرسائل ستظهر هنا",
-                color = Color.Gray,
-                modifier = Modifier.padding(top = 6.dp)
-            )
+            Spacer(Modifier.height(18.dp))
+            Box(
+                Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xFF29163D), Color(0xFF0B0810)))),
+                contentAlignment = Alignment.Center
+            ) { Text("LIVE VIDEO", color = Color.Gray, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
+            Spacer(Modifier.height(14.dp))
+            Text("Send a gift", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Spacer(Modifier.height(8.dp))
+            val gifts = listOf("👑" to 100, "💎" to 250, "🚀" to 500, "🌟" to 1000)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(gifts) { (emoji, price) ->
+                    Column(
+                        Modifier.width(76.dp).clip(RoundedCornerShape(16.dp)).background(Card)
+                            .clickable { selectedGift = emoji; onGift(price) }.padding(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(emoji, fontSize = 34.sp)
+                        Text("$price", fontSize = 12.sp, color = Color.White)
+                    }
+                }
+            }
+            if (selectedGift != null) {
+                Text("Gift sent: $selectedGift", color = Purple, modifier = Modifier.padding(top = 8.dp))
+            }
         }
     }
 }
 
-}
-
-@androidx.compose.runtime.Composable
-fun ProfileScreen(
-modifier: Modifier = Modifier
-) {
-
-Column(
-    modifier = modifier
-        .fillMaxSize()
-        .background(Color(0xFF08080D))
-        .padding(20.dp),
-    horizontalAlignment = Alignment.CenterHorizontally
-) {
-
-    Spacer(modifier = Modifier.height(35.dp))
-
-    Box(
-        modifier = Modifier
-            .size(100.dp)
-            .clip(CircleShape)
-            .background(Color(0xFF713DFF)),
-        contentAlignment = Alignment.Center
-    ) {
-
-        Icon(
-            imageVector = Icons.Default.Person,
-            contentDescription = "Profile",
-            tint = Color.White,
-            modifier = Modifier.size(55.dp)
-        )
-    }
-
-    Spacer(modifier = Modifier.height(18.dp))
-
-    Text(
-        text = "Wave User",
-        color = Color.White,
-        fontSize = 24.sp,
-        fontWeight = FontWeight.Bold
-    )
-
-    Text(
-        text = "Wave Live",
-        color = Color(0xFFB98CFF),
-        fontSize = 15.sp
-    )
-
-    Spacer(modifier = Modifier.height(30.dp))
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFF15151D),
-        shape = RoundedCornerShape(18.dp)
-    ) {
-
-        Row(
-            modifier = Modifier.padding(20.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-
-            ProfileStat(
-                value = "0",
-                label = "Followers"
-            )
-
-            ProfileStat(
-                value = "0",
-                label = "Following"
-            )
-
-            ProfileStat(
-                value = "0",
-                label = "Coins"
-            )
+@Composable
+fun CreateScreen() {
+    Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("Go Live", fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(18.dp))
+        Text("Start your Wave live session", color = Color.Gray)
+        Spacer(Modifier.height(30.dp))
+        Button(onClick = {}, modifier = Modifier.fillMaxWidth().height(54.dp), colors = ButtonDefaults.buttonColors(containerColor = Purple)) {
+            Text("Start Broadcast")
         }
     }
+}
 
-    Spacer(modifier = Modifier.height(25.dp))
-
-    Button(
-        onClick = { },
-        modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF713DFF)
-        )
-    ) {
-
-        Text(
-            text = "Edit Profile"
-        )
+@Composable
+fun CenterMessage(title: String, message: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(title, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(message, color = Color.Gray)
+        }
     }
 }
 
-}
-
-@androidx.compose.runtime.Composable
-fun ProfileStat(
-value: String,
-label: String
-) {
-
-Column(
-    horizontalAlignment = Alignment.CenterHorizontally
-) {
-
-    Text(
-        text = value,
-        color = Color.White,
-        fontSize = 20.sp,
-        fontWeight = FontWeight.Bold
+@Composable
+fun WalletDialog(coins: Int, onClose: () -> Unit, onAdd: (Int) -> Unit) {
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("Wave Wallet") },
+        text = {
+            Column {
+                Text("Balance: $coins coins", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
+                Text("Wallet payment options")
+                Spacer(Modifier.height(8.dp))
+                Text("01284306120")
+                Text("01144210918")
+                Spacer(Modifier.height(14.dp))
+                Text("Demo recharge buttons")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { onAdd(500); onClose() }) { Text("+500") }
+                    Button(onClick = { onAdd(1000); onClose() }) { Text("+1000") }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onClose) { Text("Close") } }
     )
-
-    Text(
-        text = label,
-        color = Color.Gray,
-        fontSize = 12.sp
-    )
-}
-
 }
