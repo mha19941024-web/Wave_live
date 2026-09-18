@@ -15,10 +15,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+        uses: actions/checkout@v7
 
       - name: Set up Java 17
-        uses: actions/setup-java@0f7e5a5b6f2d7f8c5c7f5c0e4e5c5d6c7b8a9d0e
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -35,6 +35,15 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x gradlew
 
+      - name: Build APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: Wave-Live-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
       - name: Build APK
         run: ./gradlew assembleDebug --stacktrace
 
