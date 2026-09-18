@@ -1,8 +1,0 @@
-<resources>
-    <style name="Theme.WaveLive" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:fontFamily">sans</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">#08060D</item>
-        <item name="android:navigationBarColor">#08060D</item>
-    </style>
-</resources>
