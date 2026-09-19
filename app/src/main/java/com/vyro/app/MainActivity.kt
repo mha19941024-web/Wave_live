@@ -8,8 +8,8 @@ import android.widget.MediaController
 import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,48 +30,43 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Inbox
-import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.VideoCall
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Wallet
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -81,15 +76,8 @@ import java.net.URL
 private const val API_BASE =
     "https://worker-jolly-band-100e.mha19941024.workers.dev"
 
-private const val PREFS = "wave_live_session"
-private const val TOKEN_KEY = "token"
-
-private val WaveBlack = Color(0xFF07060B)
-private val WaveSurface = Color(0xFF14111B)
-private val WavePurple = Color(0xFF9B5CFF)
-private val WavePink = Color(0xFFFF4FA3)
-private val WaveGold = Color(0xFFFFC857)
-private val WaveGreen = Color(0xFF20D889)
+private val WavePurple = Color(0xFF7C4DFF)
+private val WaveDark = Color(0xFF08080D)
 
 data class WaveUser(
     val id: String = "",
@@ -100,12 +88,12 @@ data class WaveUser(
 )
 
 data class WaveVideo(
-    val id: String = "",
-    val url: String = "",
-    val user: String = "",
-    val caption: String = "",
-    val likes: Int = 0,
-    val liked: Boolean = false
+    val id: String,
+    val url: String,
+    val user: String,
+    val caption: String,
+    val likes: Int,
+    val liked: Boolean
 )
 
 data class ApiResult(
@@ -115,171 +103,154 @@ data class ApiResult(
 
 object WaveApi {
 
-    private fun open(
-        method: String,
-        path: String,
-        token: String? = null
-    ): HttpURLConnection {
-        val connection =
-            URL(API_BASE + path).openConnection() as HttpURLConnection
-
-        connection.requestMethod = method
-        connection.connectTimeout = 20_000
-        connection.readTimeout = 30_000
-        connection.setRequestProperty("Accept", "application/json")
-
-        if (!token.isNullOrBlank()) {
-            connection.setRequestProperty(
-                "Authorization",
-                "Bearer $token"
-            )
-        }
-
-        return connection
-    }
-
-    suspend fun request(
+    private suspend fun request(
         method: String,
         path: String,
         token: String? = null,
         body: String? = null
     ): ApiResult = withContext(Dispatchers.IO) {
 
-        val connection = open(method, path, token)
+        try {
+            val connection =
+                URL(API_BASE + path).openConnection() as HttpURLConnection
 
-        if (body != null) {
-            connection.doOutput = true
-            connection.setRequestProperty(
-                "Content-Type",
-                "application/json; charset=utf-8"
+            connection.requestMethod = method
+            connection.connectTimeout = 15000
+            connection.readTimeout = 20000
+            connection.setRequestProperty("Accept", "application/json")
+
+            if (!token.isNullOrBlank()) {
+                connection.setRequestProperty(
+                    "Authorization",
+                    "Bearer $token"
+                )
+            }
+
+            if (body != null) {
+                connection.doOutput = true
+                connection.setRequestProperty(
+                    "Content-Type",
+                    "application/json"
+                )
+                connection.outputStream.use {
+                    it.write(body.toByteArray())
+                }
+            }
+
+            val code = connection.responseCode
+
+            val stream =
+                if (code in 200..399) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
+
+            val response =
+                stream?.bufferedReader()?.use { it.readText() } ?: ""
+
+            connection.disconnect()
+
+            ApiResult(code, response)
+
+        } catch (e: Exception) {
+            ApiResult(
+                -1,
+                e.message ?: "Network error"
             )
-
-            connection.outputStream.use {
-                it.write(body.toByteArray(Charsets.UTF_8))
-            }
         }
-
-        val code = connection.responseCode
-
-        val stream =
-            if (code in 200..299) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            }
-
-        val text = stream?.bufferedReader()?.use {
-            it.readText()
-        } ?: ""
-
-        connection.disconnect()
-
-        ApiResult(code, text)
     }
 
-    suspend fun createSession(): ApiResult {
-        return request(
-            method = "POST",
-            path = "/api/session"
+    suspend fun createSession(): ApiResult =
+        request(
+            "POST",
+            "/api/session",
+            body = "{}"
         )
-    }
 
-    suspend fun getMe(token: String): ApiResult {
-        return request(
-            method = "GET",
-            path = "/api/me",
-            token = token
+    suspend fun me(token: String): ApiResult =
+        request(
+            "GET",
+            "/api/me",
+            token
         )
-    }
 
-    suspend fun getFeed(token: String): ApiResult {
-        return request(
-            method = "GET",
-            path = "/api/feed?limit=20",
-            token = token
+    suspend fun feed(token: String): ApiResult =
+        request(
+            "GET",
+            "/api/feed?limit=20",
+            token
         )
-    }
 
     suspend fun like(
         token: String,
         videoId: String,
         liked: Boolean
     ): ApiResult {
-        return request(
-            method = if (liked) "DELETE" else "POST",
-            path = "/api/videos/$videoId/like",
-            token = token
-        )
-    }
-
-    suspend fun follow(
-        token: String,
-        username: String,
-        following: Boolean
-    ): ApiResult {
-        return request(
-            method = if (following) "DELETE" else "POST",
-            path = "/api/users/$username/follow",
-            token = token
-        )
-    }
-
-    suspend fun updateProfile(
-        token: String,
-        displayName: String,
-        bio: String
-    ): ApiResult {
-        val json = JSONObject()
-            .put("displayName", displayName)
-            .put("bio", bio)
-
-        return request(
-            method = "PATCH",
-            path = "/api/profile",
-            token = token,
-            body = json.toString()
-        )
+        return if (liked) {
+            request(
+                "POST",
+                "/api/videos/$videoId/like",
+                token,
+                "{}"
+            )
+        } else {
+            request(
+                "DELETE",
+                "/api/videos/$videoId/like",
+                token
+            )
+        }
     }
 
     suspend fun createLive(
         token: String,
         title: String
-    ): ApiResult {
-        val json = JSONObject()
-            .put("title", title)
-
-        return request(
-            method = "POST",
-            path = "/api/live/create",
-            token = token,
-            body = json.toString()
+    ): ApiResult =
+        request(
+            "POST",
+            "/api/live/create",
+            token,
+            JSONObject()
+                .put("title", title)
+                .toString()
         )
-    }
 
-    suspend fun getGifts(token: String): ApiResult {
-        return request(
-            method = "GET",
-            path = "/api/gifts",
-            token = token
+    suspend fun updateProfile(
+        token: String,
+        displayName: String,
+        bio: String
+    ): ApiResult =
+        request(
+            "PATCH",
+            "/api/profile",
+            token,
+            JSONObject()
+                .put("displayName", displayName)
+                .put("bio", bio)
+                .toString()
         )
-    }
 
-    suspend fun publishVideo(
+    suspend fun createVideo(
         token: String,
         url: String,
         caption: String
-    ): ApiResult {
-        val json = JSONObject()
-            .put("url", url)
-            .put("caption", caption)
-
-        return request(
-            method = "POST",
-            path = "/api/videos",
-            token = token,
-            body = json.toString()
+    ): ApiResult =
+        request(
+            "POST",
+            "/api/videos",
+            token,
+            JSONObject()
+                .put("url", url)
+                .put("caption", caption)
+                .toString()
         )
-    }
+
+    suspend fun gifts(): ApiResult =
+        request(
+            "GET",
+            "/api/gifts"
+        )
 }
 
 class MainActivity : ComponentActivity() {
@@ -288,196 +259,101 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            WaveTheme {
-                WaveApp()
+            MaterialTheme {
+                WaveRoot()
             }
         }
     }
 }
 
-@androidx.compose.runtime.Composable
-private fun WaveTheme(
-    content: @androidx.compose.runtime.Composable () -> Unit
-) {
-    MaterialTheme(
-        colorScheme = androidx.compose.material3.darkColorScheme(
-            primary = WavePurple,
-            secondary = WavePink,
-            background = WaveBlack,
-            surface = WaveSurface
-        ),
-        content = content
-    )
-}
+@Composable
+private fun WaveRoot() {
 
-@androidx.compose.runtime.Composable
-private fun WaveApp() {
+    var token by remember { mutableStateOf<String?>(null) }
+    var user by remember { mutableStateOf<WaveUser?>(null) }
+    var videos by remember { mutableStateOf<List<WaveVideo>>(emptyList()) }
+    var selectedTab by remember { mutableStateOf(0) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf("") }
 
-    val context = LocalContext.current
-
-    var token by remember {
-        mutableStateOf(
-            context
-                .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getString(TOKEN_KEY, null)
-        )
-    }
-
-    var user by remember {
-        mutableStateOf(WaveUser())
-    }
-
-    var videos by remember {
-        mutableStateOf<List<WaveVideo>>(emptyList())
-    }
-
-    var selectedTab by remember {
-        mutableIntStateOf(0)
-    }
-
-    var loading by remember {
-        mutableStateOf(true)
-    }
-
-    var errorMessage by remember {
-        mutableStateOf("")
-    }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
 
+        val session = WaveApi.createSession()
+
+        if (session.code !in 200..299) {
+            error = "تعذر الاتصال بخادم Wave Live"
+            loading = false
+            return@LaunchedEffect
+        }
+
         try {
 
-            if (token.isNullOrBlank()) {
+            val json = JSONObject(session.body)
 
-                val result = WaveApi.createSession()
+            val newToken =
+                json.optString("token")
 
-                if (result.code !in 200..299) {
-                    errorMessage = "تعذر الاتصال بخادم Wave"
-                    loading = false
-                    return@LaunchedEffect
-                }
+            token = newToken
 
-                val json = JSONObject(result.body)
-                val newToken = json.optString("token")
+            val userObject =
+                json.optJSONObject("user")
 
-                if (newToken.isBlank()) {
-                    errorMessage = "الخادم لم يرجع جلسة صحيحة"
-                    loading = false
-                    return@LaunchedEffect
-                }
-
-                token = newToken
-
-                context
-                    .getSharedPreferences(
-                        PREFS,
-                        Context.MODE_PRIVATE
-                    )
-                    .edit()
-                    .putString(TOKEN_KEY, newToken)
-                    .apply()
+            if (userObject != null) {
+                user = parseUser(userObject)
             }
 
-            val activeToken = token ?: ""
-
-            val meResult = WaveApi.getMe(activeToken)
+            val meResult =
+                WaveApi.me(newToken)
 
             if (meResult.code in 200..299) {
 
-                val json = JSONObject(meResult.body)
-                    .optJSONObject("user")
+                val meJson =
+                    JSONObject(meResult.body)
 
-                if (json != null) {
-                    user = parseUser(json)
-                }
+                val meObject =
+                    meJson.optJSONObject("user")
+                        ?: meJson
+
+                user = parseUser(meObject)
             }
 
-            val feedResult = WaveApi.getFeed(activeToken)
+            val feedResult =
+                WaveApi.feed(newToken)
 
             if (feedResult.code in 200..299) {
 
-                val items = JSONObject(feedResult.body)
-                    .optJSONArray("items")
+                val feedJson =
+                    JSONObject(feedResult.body)
 
-                videos = parseVideos(items)
-            } else {
-                errorMessage = "تعذر تحميل الفيديوهات"
+                val array =
+                    feedJson.optJSONArray("videos")
+                        ?: feedJson.optJSONArray("data")
+
+                videos = parseVideos(array)
             }
 
         } catch (e: Exception) {
-            errorMessage = e.message ?: "حدث خطأ غير معروف"
+
+            error =
+                e.message ?: "حدث خطأ أثناء تشغيل التطبيق"
         }
 
         loading = false
     }
 
     Scaffold(
-        containerColor = WaveBlack,
+        containerColor = WaveDark,
         bottomBar = {
 
-            NavigationBar(
-                containerColor = WaveSurface,
-                modifier = Modifier.navigationBarsPadding()
-            ) {
+            if (!loading) {
 
-                NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    icon = {
-                        Icon(
-                            Icons.Default.Home,
-                            contentDescription = "الرئيسية"
-                        )
-                    },
-                    label = { Text("الرئيسية") }
-                )
-
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    icon = {
-                        Icon(
-                            Icons.Default.LiveTv,
-                            contentDescription = "LIVE"
-                        )
-                    },
-                    label = { Text("LIVE") }
-                )
-
-                NavigationBarItem(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    icon = {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "إنشاء"
-                        )
-                    },
-                    label = { Text("إنشاء") }
-                )
-
-                NavigationBarItem(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 },
-                    icon = {
-                        Icon(
-                            Icons.Default.Inbox,
-                            contentDescription = "الوارد"
-                        )
-                    },
-                    label = { Text("الوارد") }
-                )
-
-                NavigationBarItem(
-                    selected = selectedTab == 4,
-                    onClick = { selectedTab = 4 },
-                    icon = {
-                        Icon(
-                            Icons.Default.Person,
-                            contentDescription = "الملف"
-                        )
-                    },
-                    label = { Text("ملفي") }
+                WaveBottomBar(
+                    selected = selectedTab,
+                    onSelected = {
+                        selectedTab = it
+                    }
                 )
             }
         }
@@ -486,75 +362,57 @@ private fun WaveApp() {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(WaveBlack)
+                .background(WaveDark)
                 .padding(padding)
         ) {
 
             if (loading) {
 
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-
-                    Text(
-                        text = "WAVE",
-                        color = WavePurple,
-                        fontSize = 42.sp
-                    )
-
-                    Spacer(
-                        modifier = Modifier.height(12.dp)
-                    )
-
-                    LinearProgressIndicator(
-                        modifier = Modifier.width(180.dp)
-                    )
-
-                    Spacer(
-                        modifier = Modifier.height(12.dp)
-                    )
-
-                    Text(
-                        text = "جارٍ تحميل Wave Live...",
-                        color = Color.White
-                    )
-                }
+                LoadingScreen()
 
             } else {
 
                 when (selectedTab) {
 
                     0 -> HomeScreen(
-                        token = token ?: "",
                         videos = videos,
                         onLike = { video ->
 
-                            val currentToken = token ?: ""
+                            val currentToken =
+                                token ?: return@HomeScreen
 
-                            videos = videos.map {
-                                if (it.id == video.id) {
-                                    it.copy(
-                                        liked = !it.liked,
-                                        likes = if (it.liked) {
-                                            maxOf(0, it.likes - 1)
-                                        } else {
-                                            it.likes + 1
-                                        }
-                                    )
-                                } else {
-                                    it
+                            val newLiked =
+                                !video.liked
+
+                            videos =
+                                videos.map {
+
+                                    if (it.id == video.id) {
+
+                                        it.copy(
+                                            liked = newLiked,
+                                            likes =
+                                                if (newLiked) {
+                                                    it.likes + 1
+                                                } else {
+                                                    maxOf(
+                                                        0,
+                                                        it.likes - 1
+                                                    )
+                                                }
+                                        )
+
+                                    } else {
+                                        it
+                                    }
                                 }
-                            }
 
-                            kotlinx.coroutines.GlobalScope.launch(
-                                Dispatchers.IO
-                            ) {
+                            scope.launch {
+
                                 WaveApi.like(
                                     currentToken,
                                     video.id,
-                                    video.liked
+                                    newLiked
                                 )
                             }
                         }
@@ -565,7 +423,38 @@ private fun WaveApp() {
                     )
 
                     2 -> CreateScreen(
-                        token = token ?: ""
+                        token = token ?: "",
+                        onPublished = {
+
+                            scope.launch {
+
+                                val result =
+                                    WaveApi.feed(
+                                        token ?: ""
+                                    )
+
+                                if (result.code in 200..299) {
+
+                                    try {
+
+                                        val json =
+                                            JSONObject(result.body)
+
+                                        videos =
+                                            parseVideos(
+                                                json.optJSONArray(
+                                                    "videos"
+                                                )
+                                                    ?: json.optJSONArray(
+                                                        "data"
+                                                    )
+                                            )
+
+                                    } catch (_: Exception) {
+                                    }
+                                }
+                            }
+                        }
                     )
 
                     3 -> InboxScreen()
@@ -580,7 +469,7 @@ private fun WaveApp() {
                 }
             }
 
-            if (errorMessage.isNotBlank()) {
+            if (error.isNotBlank()) {
 
                 Card(
                     modifier = Modifier
@@ -590,8 +479,9 @@ private fun WaveApp() {
                         containerColor = Color(0xFF3A1725)
                     )
                 ) {
+
                     Text(
-                        text = errorMessage,
+                        text = error,
                         color = Color.White,
                         modifier = Modifier.padding(14.dp)
                     )
@@ -601,50 +491,132 @@ private fun WaveApp() {
     }
 }
 
-private fun parseUser(
-    json: JSONObject
-): WaveUser {
+@Composable
+private fun LoadingScreen() {
 
-    return WaveUser(
-        id = json.optString("id"),
-        username = json.optString("username"),
-        displayName = json.optString("displayName"),
-        bio = json.optString("bio"),
-        avatarUrl = json.optString("avatarUrl")
-    )
-}
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
 
-private fun parseVideos(
-    array: JSONArray?
-): List<WaveVideo> {
+        Text(
+            text = "WAVE",
+            color = WavePurple,
+            fontSize = 46.sp,
+            fontWeight = FontWeight.Bold
+        )
 
-    if (array == null) {
-        return emptyList()
-    }
+        Spacer(
+            modifier = Modifier.height(12.dp)
+        )
 
-    val result = mutableListOf<WaveVideo>()
-
-    for (i in 0 until array.length()) {
-
-        val item = array.optJSONObject(i)
-            ?: continue
-
-        result += WaveVideo(
-            id = item.optString("id"),
-            url = item.optString("url"),
-            user = item.optString("user"),
-            caption = item.optString("caption"),
-            likes = item.optInt("likes"),
-            liked = item.optBoolean("liked", false)
+        Text(
+            text = "جارٍ تحميل Wave Live...",
+            color = Color.White
         )
     }
-
-    return result
 }
 
-@androidx.compose.runtime.Composable
+@Composable
+private fun WaveBottomBar(
+    selected: Int,
+    onSelected: (Int) -> Unit
+) {
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black)
+            .navigationBarsPadding()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceAround,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+
+        BottomItem(
+            icon = Icons.Default.Home,
+            text = "الرئيسية",
+            selected = selected == 0
+        ) {
+            onSelected(0)
+        }
+
+        BottomItem(
+            icon = Icons.Default.Videocam,
+            text = "LIVE",
+            selected = selected == 1
+        ) {
+            onSelected(1)
+        }
+
+        BottomItem(
+            icon = Icons.Default.Add,
+            text = "إنشاء",
+            selected = selected == 2
+        ) {
+            onSelected(2)
+        }
+
+        BottomItem(
+            icon = Icons.Default.Chat,
+            text = "الوارد",
+            selected = selected == 3
+        ) {
+            onSelected(3)
+        }
+
+        BottomItem(
+            icon = Icons.Default.Person,
+            text = "حسابي",
+            selected = selected == 4
+        ) {
+            onSelected(4)
+        }
+    }
+}
+
+@Composable
+private fun BottomItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+
+    Column(
+        modifier = Modifier
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+
+        Icon(
+            imageVector = icon,
+            contentDescription = text,
+            tint =
+                if (selected) {
+                    WavePurple
+                } else {
+                    Color.Gray
+                }
+        )
+
+        Text(
+            text = text,
+            color =
+                if (selected) {
+                    Color.White
+                } else {
+                    Color.Gray
+                },
+            fontSize = 11.sp
+        )
+    }
+}
+
+@Composable
 private fun HomeScreen(
-    token: String,
     videos: List<WaveVideo>,
     onLike: (WaveVideo) -> Unit
 ) {
@@ -662,11 +634,12 @@ private fun HomeScreen(
             Text(
                 text = "WAVE",
                 color = WavePurple,
-                fontSize = 40.sp
+                fontSize = 42.sp,
+                fontWeight = FontWeight.Bold
             )
 
             Spacer(
-                modifier = Modifier.height(12.dp)
+                modifier = Modifier.height(16.dp)
             )
 
             Text(
@@ -693,29 +666,43 @@ private fun HomeScreen(
 
         item {
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 12.dp,
-                        bottom = 8.dp
-                    ),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-
-                Text(
-                    text = "WAVE",
-                    color = WavePurple,
-                    fontSize = 28.sp
+            Text(
+                text = "WAVE",
+                color = WavePurple,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(
+                    horizontal = 16.dp,
+                    vertical = 14.dp
                 )
+            )
+        }
 
-                Spacer(
-                    modifier = Modifier.weight(1f)
-                )
+        items(
+            items = videos,
+            key = { it.id }
+        ) { video ->
 
-                Icon(
-                    Icons.Default.Send,
-                    contentDescription = null,
-                    tint = Color.White
+            VideoCard(
+                video = video,
+                onLike = {
+                    onLike(video)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun VideoCard(
+    video: WaveVideo,
+    onLike: () -> Unit
+) {
+
+    val context = LocalContext.current
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                horizontal
