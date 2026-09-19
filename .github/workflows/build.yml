@@ -15,15 +15,19 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Setup JDK 17
-        uses: actions/setup-java@17bec8d0b8f6f2c0d6f8f2e4d8f6d6b5f6e4a4f
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@b422f9f4b8f0f8d4c7f3a5c6c0e2a7f8d9b1c2e3
+      - name: Setup Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3
         with:
           gradle-version: '8.10.2'
+          validate-wrappers: false
+
+      - name: Check Gradle
+        run: gradle --version
 
       - name: Build Debug APK
         run: gradle :app:assembleDebug --stacktrace
