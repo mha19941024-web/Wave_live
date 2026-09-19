@@ -56,9 +56,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -169,10 +169,14 @@ private fun LoginScreen(
                 fontWeight = FontWeight.Black
             )
 
+            Spacer(
+                modifier = Modifier.height(4.dp)
+            )
+
             Text(
                 text = "WAVE LIVE",
                 color = WavePurple,
-                fontSize = 20.sp,
+                fontSize = 21.sp,
                 fontWeight = FontWeight.Bold
             )
 
@@ -224,7 +228,7 @@ private fun LoginScreen(
             )
 
             Text(
-                text = "يمكنك إنشاء حسابك والبدء في استخدام Wave Live",
+                text = "ابدأ رحلتك مع Wave Live",
                 color = Color.Gray,
                 fontSize = 13.sp
             )
@@ -241,11 +245,10 @@ private fun LoginScreen(
                 Text("إنشاء حساب Wave")
             },
             text = {
-
                 Column {
 
                     Text(
-                        "أنشئ حسابك لبدء متابعة الفيديوهات والبث المباشر."
+                        text = "أنشئ حسابك لبدء متابعة الفيديوهات والبث المباشر."
                     )
 
                     Spacer(
@@ -253,14 +256,13 @@ private fun LoginScreen(
                     )
 
                     Text(
-                        "حساب جديد",
+                        text = "حساب جديد",
                         color = WavePurple,
                         fontWeight = FontWeight.Bold
                     )
                 }
             },
             confirmButton = {
-
                 Button(
                     onClick = {
                         showRegister = false
@@ -271,7 +273,6 @@ private fun LoginScreen(
                 }
             },
             dismissButton = {
-
                 TextButton(
                     onClick = {
                         showRegister = false
@@ -287,7 +288,7 @@ private fun LoginScreen(
 @Composable
 private fun MainWaveScreen() {
 
-    var tab by remember {
+    var selectedTab by remember {
         mutableStateOf(WaveTab.HOME)
     }
 
@@ -299,7 +300,7 @@ private fun MainWaveScreen() {
         mutableStateOf(false)
     }
 
-    var showLive by remember {
+    var showLiveRoom by remember {
         mutableStateOf(false)
     }
 
@@ -313,13 +314,13 @@ private fun MainWaveScreen() {
             ) {
 
                 NavigationBarItem(
-                    selected = tab == WaveTab.HOME,
+                    selected = selectedTab == WaveTab.HOME,
                     onClick = {
-                        tab = WaveTab.HOME
+                        selectedTab = WaveTab.HOME
                     },
                     icon = {
                         Icon(
-                            Icons.Default.Home,
+                            imageVector = Icons.Default.Home,
                             contentDescription = "الرئيسية"
                         )
                     },
@@ -329,13 +330,13 @@ private fun MainWaveScreen() {
                 )
 
                 NavigationBarItem(
-                    selected = tab == WaveTab.LIVE,
+                    selected = selectedTab == WaveTab.LIVE,
                     onClick = {
-                        tab = WaveTab.LIVE
+                        selectedTab = WaveTab.LIVE
                     },
                     icon = {
                         Icon(
-                            Icons.Default.LiveTv,
+                            imageVector = Icons.Default.LiveTv,
                             contentDescription = "مباشر"
                         )
                     },
@@ -345,13 +346,13 @@ private fun MainWaveScreen() {
                 )
 
                 NavigationBarItem(
-                    selected = tab == WaveTab.CREATE,
+                    selected = selectedTab == WaveTab.CREATE,
                     onClick = {
-                        tab = WaveTab.CREATE
+                        selectedTab = WaveTab.CREATE
                     },
                     icon = {
                         Icon(
-                            Icons.Default.Add,
+                            imageVector = Icons.Default.Add,
                             contentDescription = "إنشاء"
                         )
                     },
@@ -361,13 +362,13 @@ private fun MainWaveScreen() {
                 )
 
                 NavigationBarItem(
-                    selected = tab == WaveTab.INBOX,
+                    selected = selectedTab == WaveTab.INBOX,
                     onClick = {
-                        tab = WaveTab.INBOX
+                        selectedTab = WaveTab.INBOX
                     },
                     icon = {
                         Icon(
-                            Icons.Default.Chat,
+                            imageVector = Icons.Default.Chat,
                             contentDescription = "الرسائل"
                         )
                     },
@@ -377,13 +378,13 @@ private fun MainWaveScreen() {
                 )
 
                 NavigationBarItem(
-                    selected = tab == WaveTab.PROFILE,
+                    selected = selectedTab == WaveTab.PROFILE,
                     onClick = {
-                        tab = WaveTab.PROFILE
+                        selectedTab = WaveTab.PROFILE
                     },
                     icon = {
                         Icon(
-                            Icons.Default.Person,
+                            imageVector = Icons.Default.Person,
                             contentDescription = "حسابي"
                         )
                     },
@@ -393,59 +394,58 @@ private fun MainWaveScreen() {
                 )
             }
         }
-    ) { padding ->
+    ) { paddingValues ->
 
-        when (tab) {
+        when (selectedTab) {
 
             WaveTab.HOME -> {
-
                 HomeScreen(
-                    modifier = Modifier.padding(padding),
+                    modifier = Modifier.padding(paddingValues),
                     coins = coins,
                     onWallet = {
                         showWallet = true
                     },
                     onLive = {
-                        tab = WaveTab.LIVE
+                        selectedTab = WaveTab.LIVE
                     }
                 )
             }
 
             WaveTab.LIVE -> {
-
                 LiveScreen(
-                    modifier = Modifier.padding(padding),
+                    modifier = Modifier.padding(paddingValues),
                     coins = coins,
                     onWallet = {
                         showWallet = true
                     },
                     onOpenLive = {
-                        showLive = true
+                        showLiveRoom = true
                     }
                 )
             }
 
             WaveTab.CREATE -> {
-
                 CreateScreen(
-                    modifier = Modifier.padding(padding),
+                    modifier = Modifier.padding(paddingValues),
+                    coins = coins,
+                    onWallet = {
+                        showWallet = true
+                    },
                     onStartLive = {
-                        tab = WaveTab.LIVE
+                        showLiveRoom = true
                     }
                 )
             }
 
             WaveTab.INBOX -> {
-
                 InboxScreen(
-                    modifier = Modifier.padding(padding)
+                    modifier = Modifier.padding(paddingValues)
                 )
             }
 
             WaveTab.PROFILE -> {
-
                 ProfileScreen(
-                    modifier = Modifier.padding(padding),
+                    modifier = Modifier.padding(paddingValues),
                     coins = coins,
                     onWallet = {
                         showWallet = true
@@ -468,15 +468,14 @@ private fun MainWaveScreen() {
         )
     }
 
-    if (showLive) {
+    if (showLiveRoom) {
 
         LiveRoomDialog(
             coins = coins,
             onClose = {
-                showLive = false
+                showLiveRoom = false
             },
             onGift = { price ->
-
                 if (coins >= price) {
                     coins -= price
                 }
@@ -522,7 +521,7 @@ private fun TopBar(
             ) {
 
                 Icon(
-                    Icons.Default.AccountBalanceWallet,
+                    imageVector = Icons.Default.AccountBalanceWallet,
                     contentDescription = "المحفظة",
                     tint = WaveGold
                 )
@@ -540,19 +539,16 @@ private fun HomeScreen(
 ) {
 
     val videos = listOf(
-
         VideoItem(
             creator = "Wave Creator",
             title = "أهلاً بكم في Wave Live",
             likes = 2450
         ),
-
         VideoItem(
             creator = "Mona Wave",
             title = "يوم جديد وبث جديد ❤️",
             likes = 1830
         ),
-
         VideoItem(
             creator = "Ahmed Live",
             title = "شاهد أحدث فيديوهات Wave",
@@ -591,7 +587,7 @@ private fun HomeScreen(
                 ) {
 
                     Icon(
-                        Icons.Default.LiveTv,
+                        imageVector = Icons.Default.LiveTv,
                         contentDescription = null
                     )
 
@@ -609,7 +605,7 @@ private fun HomeScreen(
                 ) {
 
                     Icon(
-                        Icons.Default.VideoLibrary,
+                        imageVector = Icons.Default.VideoLibrary,
                         contentDescription = null
                     )
 
@@ -639,7 +635,6 @@ private fun HomeScreen(
         }
 
         items(videos) { video ->
-
             VideoCard(video)
         }
     }
@@ -669,15 +664,13 @@ private fun VideoCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp)
-                    .background(
-                        Color(0xFF211A2D)
-                    ),
+                    .background(Color(0xFF211A2D)),
                 contentAlignment = Alignment.Center
             ) {
 
                 Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = null,
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "تشغيل",
                     tint = WavePurple,
                     modifier = Modifier.size(64.dp)
                 )
@@ -731,7 +724,7 @@ private fun VideoCard(
                 ) {
 
                     Icon(
-                        Icons.Default.Favorite,
+                        imageVector = Icons.Default.Favorite,
                         contentDescription = null,
                         tint = WavePink,
                         modifier = Modifier.size(18.dp)
@@ -753,155 +746,4 @@ private fun VideoCard(
 
 @Composable
 private fun LiveScreen(
-    modifier: Modifier,
-    coins: Int,
-    onWallet: () -> Unit,
-    onOpenLive: () -> Unit
-) {
-
-    val creators = listOf(
-
-        LiveCreator(
-            name = "Wave Star",
-            viewers = "12.4K",
-            title = "ليلة Wave الآن 🔥"
-        ),
-
-        LiveCreator(
-            name = "Mona Wave",
-            viewers = "8.1K",
-            title = "تعالوا نتكلم ❤️"
-        ),
-
-        LiveCreator(
-            name = "Ahmed Live",
-            viewers = "5.7K",
-            title = "مباشر من Wave"
-        )
-    )
-
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .background(WaveBackground)
-    ) {
-
-        item {
-
-            TopBar(
-                title = "البث المباشر",
-                coins = coins,
-                onWallet = onWallet
-            )
-
-            Text(
-                text = "مباشر الآن",
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(
-                    horizontal = 16.dp,
-                    vertical = 8.dp
-                )
-            )
-        }
-
-        items(creators) { creator ->
-
-            LiveCreatorCard(
-                creator = creator,
-                onOpenLive = onOpenLive
-            )
-        }
-    }
-}
-
-@Composable
-private fun LiveCreatorCard(
-    creator: LiveCreator,
-    onOpenLive: () -> Unit
-) {
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                horizontal = 16.dp,
-                vertical = 7.dp
-            )
-            .clickable {
-                onOpenLive()
-            },
-        colors = CardDefaults.cardColors(
-            containerColor = WaveCard
-        ),
-        shape = RoundedCornerShape(18.dp)
-    ) {
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(CircleShape)
-                    .background(WavePink),
-                contentAlignment = Alignment.Center
-            ) {
-
-                Icon(
-                    Icons.Default.Videocam,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-
-            Spacer(
-                modifier = Modifier.width(12.dp)
-            )
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-
-                Text(
-                    text = creator.name,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = creator.title,
-                    color = Color.LightGray,
-                    fontSize = 13.sp
-                )
-
-                Text(
-                    text = "👁 ${creator.viewers} مشاهد",
-                    color = WaveGreen,
-                    fontSize = 12.sp
-                )
-            }
-
-            Button(
-                onClick = onOpenLive,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = WavePurple
-                )
-            ) {
-
-                Text("دخول")
-            }
-        }
-    }
-}
-
-@Composable
-private fun CreateScreen(
-    modifier: Modifier,
-    on
+    modifier: Modifier
