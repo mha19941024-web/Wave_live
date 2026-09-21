@@ -14,7 +14,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Prepare Java 17
+      - name: Checkout repository
+        uses: actions/checkout@11d5960e0e9b9bb4e0b8f6b1c2f2b8c8f1c7f4d8
+
+      - name: Set up Java 17
         run: |
           echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
           echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
@@ -24,7 +27,7 @@ jobs:
           java -version
           javac -version
 
-      - name: Verify repository
+      - name: Verify project files
         run: |
           pwd
           ls -la
@@ -41,7 +44,7 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
 
-      - name: Show APK
+      - name: Verify APK
         run: |
           ls -lh app/build/outputs/apk/debug/
           test -f app/build/outputs/apk/debug/app-debug.apk
