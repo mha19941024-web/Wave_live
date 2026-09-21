@@ -18,7 +18,14 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
+
+    buildConfigField(
+        "String",
+        "API_BASE_URL",
+        "\"https://worker-jolly-band-100e.mha19941024.workers.dev\""
+    )
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -30,7 +37,9 @@ android {
     }
 
     packaging {
-        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
 }
 
