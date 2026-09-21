@@ -1,115 +1,1626 @@
 export interface Env {
   DB: D1Database;
-
   ENVIRONMENT?: string;
-
-  CLOUDFLARE_ACCOUNT_ID?: string;
-  CLOUDFLARE_API_TOKEN?: string;
-  STREAM_CUSTOMER_SUBDOMAIN?: string;
-
   SESSION_DAYS?: string;
   CORS_ORIGIN?: string;
 }
 
-type VideoRow = {
-  id: string;
-  url: string;
-  user: string;
-  caption: string;
-  likes: number;
-  created_at: string;
+const DEFAULT_GIFTS = [
+  {
+    id: "rose",
+    name: "Rose",
+    price: 5,
+    icon: "🌹",
+    imageUrl: null,
+    animationUrl: null,
+    enabled: true,
+  },
+  {
+    id: "heart",
+    name: "Heart",
+    price: 10,
+    icon: "❤️",
+    imageUrl: null,
+    animationUrl: null,
+    enabled: true,
+  },
+  {
+    id: "wave-crown",
+    name: "Wave Crown",
+    price: 500,
+    icon: "👑",
+    imageUrl: null,
+    animationUrl: null,
+    enabled: true,
+  },
+  {
+    id: "diamond",
+    name: "Diamond",
+    price: 250,
+    icon: "💎",
+    imageUrl: null,
+    animationUrl: null,
+    enabled: true,
+  },
+  {
+    id: "rocket",
+    name: "Rocket",
+    price: 500,
+    icon: "🚀",
+    imageUrl: null,
+    animationUrl: null,
+    enabled: true,
+  },
+  {
+    id: "super-star",
+    name: "Super Star",
+    price: 1000,
+    icon: "⭐",
+    imageUrl: null,
+    animationUrl: null,
+    enabled: true,
+  },
+];
+
+const jsonHeaders = {
+  "Content-Type": "application/json; charset=utf-8",
 };
 
-type GiftRow = {
-  id: string;
-  name: string;
-  icon: string;
-  priceCoins: number;
-};
+function corsHeaders(request: Request, env: Env): Record<string, string> {
+  const origin = request.headers.get("Origin") || "*";
+  const allowed = env.CORS_ORIGIN || "*";
 
-const bearer = (request: Request) => {
-  const header = request.headers.get("Authorization") ?? "";
+  return {
+    ...jsonHeaders,
+    "Access-Control-Allow-Origin": allowed === "*" ? "*" : origin,
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, X-Requested-With",
+    "Access-Control-Allow-Methods":
+      "GET, POST, PATCH, DELETE, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+  };
+}
 
-  if (!header.startsWith("Bearer ")) {
+function response(
+  body: unknown,
+  status = 200,
+  request?: Request,
+  env?: Env
+): Response {
+  const headers = corsHeaders(
+    request || new Request("https://wave.local"),
+    env || ({} as Env)
+  );
+
+  return new Response(JSON.stringify(body), {
+    status,
+    headers,
+  });
+}
+
+function now(): string {
+  return new Date().toISOString();
+}
+
+function id(prefix: string): string {
+  return `${prefix}_${crypto.randomUUID()}`;
+}
+
+function getToken(request: Request): string | null {
+  const value = request.headers.get("Authorization");
+
+  if (!value) {
     return null;
   }
 
-  return header.slice(7).trim() || null;
-};
+  if (!value.startsWith("Bearer ")) {
+    return null;
+  }
 
-const createUsername = () =>
-  `user_${crypto.randomUUID().replaceAll("-", "").slice(0, 10)}`;
-
-const json = (data: unknown, status = 200) =>
-  Response.json(data, {
-    status,
-    headers: {
-      "Cache-Control": "no-store",
-    },
-  });
-
-function cors(response: Response, env: Env) {
-  response.headers.set(
-    "Access-Control-Allow-Origin",
-    env.CORS_ORIGIN ?? "*"
-  );
-
-  response.headers.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-
-  response.headers.set(
-    "Access-Control-Allow-Methods",
-    "GET,POST,PATCH,DELETE,OPTIONS"
-  );
-
-  return response;
+  return value.substring(7).trim() || null;
 }
 
-const out = (
-  data: unknown,
-  status = 200,
-  env?: Env
-): Response => {
-  const response = json(data, status);
-  return env ? cors(response, env) : response;
-};
-
-async function auth(
+async function getUser(
   request: Request,
   env: Env
-): Promise<string | null> {
-  const token = bearer(request);
+): Promise<any | null> {
+  const token = getToken(request);
 
   if (!token) {
     return null;
   }
 
-  const row = await env.DB
-    .prepare(
-      `SELECT user_id
-       FROM sessions
-       WHERE token = ?
-       AND expires_at > ?`
-    )
-    .bind(token, new Date().toISOString())
-    .first<{ user_id: string }>();
+  const session = await env.DB.prepare(
+    `
+    SELECT
+      s.user_id,
+      s.expires_at
+    FROM sessions s
+    WHERE s.token = ?
+    LIMIT 1
+    `
+  )
+    .bind(token)
+    .first();
 
-  return row?.user_id ?? null;
+  if (!session) {
+    return null;
+  }
+
+  const expiresAt = String(session.expires_at || "");
+
+  if (expiresAt && new Date(expiresAt).getTime() < Date.now()) {
+    return null;
+  }
+
+  return await env.DB.prepare(
+    `
+    SELECT *
+    FROM users
+    WHERE id = ?
+    LIMIT 1
+    `
+  )
+    .bind(session.user_id)
+    .first();
 }
 
-function cloudflareHeaders(env: Env) {
+function publicUser(user: any, isFollowing = false) {
+  if (!user) {
+    return null;
+  }
+
   return {
-    Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-    "Content-Type": "application/json",
+    id: String(user.id || ""),
+    username: String(user.username || ""),
+    displayName: String(
+      user.display_name || user.username || ""
+    ),
+    avatar: user.avatar_url || null,
+    bio: user.bio || null,
+    coins: Number(user.coins || 0),
+    followers: Number(user.followers || 0),
+    following: Number(user.following || 0),
+    isFollowing,
+    verified: Boolean(user.verified || false),
   };
 }
 
-function isCloudflareConfigured(env: Env) {
-  return Boolean(
-    env.CLOUDFLARE_ACCOUNT_ID &&
-    env.CLOUDFLARE_API_TOKEN
+function publicGift(gift: any) {
+  return {
+    id: String(gift.id || ""),
+    name: String(gift.name || ""),
+    price: Number(gift.price || 0),
+    icon: gift.icon || "",
+    imageUrl: gift.image_url || null,
+    animationUrl: gift.animation_url || null,
+    enabled: Boolean(gift.enabled ?? true),
+  };
+}
+
+function publicLive(live: any) {
+  return {
+    id: String(live.id || ""),
+    userId: String(live.user_id || ""),
+    username: String(live.username || ""),
+    displayName: String(live.display_name || ""),
+    avatar: live.avatar_url || null,
+    title: String(live.title || ""),
+    streamUrl: live.stream_url || null,
+    playbackUrl: live.playback_url || null,
+    rtmpsUrl: live.rtmps_url || null,
+    streamKey: live.stream_key || null,
+    viewerCount: Number(live.viewer_count || 0),
+    likes: Number(live.likes || 0),
+    status: String(live.status || "active"),
+    startedAt: live.started_at || null,
+  };
+}
+
+async function ensureGifts(env: Env) {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM gifts`
+    ).first();
+
+    const count = Number(row?.count || 0);
+
+    if (count > 0) {
+      return;
+    }
+
+    for (const gift of DEFAULT_GIFTS) {
+      await env.DB.prepare(
+        `
+        INSERT OR IGNORE INTO gifts
+        (
+          id,
+          name,
+          price,
+          icon,
+          image_url,
+          animation_url,
+          enabled,
+          created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      )
+        .bind(
+          gift.id,
+          gift.name,
+          gift.price,
+          gift.icon,
+          gift.imageUrl,
+          gift.animationUrl,
+          gift.enabled ? 1 : 0,
+          now()
+        )
+        .run();
+    }
+  } catch {
+    // Database migrations are handled separately.
+  }
+}
+
+async function handleRequest(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const url = new URL(request.url);
+  const path = url.pathname;
+  const method = request.method.toUpperCase();
+
+  if (method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders(request, env),
+    });
+  }
+
+  if (path === "/health" || path === "/") {
+    return response(
+      {
+        success: true,
+        message: "Wave Server is working!",
+        environment: env.ENVIRONMENT || "production",
+        time: now(),
+      },
+      200,
+      request,
+      env
+    );
+  }
+
+  /*
+   * SESSION
+   */
+  if (path === "/api/session" && method === "POST") {
+    const userId = id("user");
+    const token = crypto.randomUUID() + crypto.randomUUID();
+
+    const username = `wave_${userId.substring(5, 13)}`;
+
+    const displayName = "Wave User";
+
+    const days = Math.max(
+      1,
+      Number(env.SESSION_DAYS || 30)
+    );
+
+    const expiresAt = new Date(
+      Date.now() + days * 86400000
+    ).toISOString();
+
+    try {
+      await env.DB.prepare(
+        `
+        INSERT INTO users
+        (
+          id,
+          username,
+          display_name,
+          coins,
+          followers,
+          following,
+          verified,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      )
+        .bind(
+          userId,
+          username,
+          displayName,
+          0,
+          0,
+          0,
+          0,
+          now(),
+          now()
+        )
+        .run();
+
+      await env.DB.prepare(
+        `
+        INSERT INTO sessions
+        (
+          token,
+          user_id,
+          expires_at,
+          created_at
+        )
+        VALUES (?, ?, ?, ?)
+        `
+      )
+        .bind(
+          token,
+          userId,
+          expiresAt,
+          now()
+        )
+        .run();
+
+      return response(
+        {
+          success: true,
+          token,
+          user: publicUser({
+            id: userId,
+            username,
+            display_name: displayName,
+            coins: 0,
+            followers: 0,
+            following: 0,
+            verified: 0,
+          }),
+        },
+        200,
+        request,
+        env
+      );
+    } catch (error) {
+      return response(
+        {
+          success: false,
+          message: "Unable to create session",
+          error: String(error),
+        },
+        500,
+        request,
+        env
+      );
+    }
+  }
+
+  /*
+   * CURRENT USER
+   */
+  if (path === "/api/me" && method === "GET") {
+    const user = await getUser(request, env);
+
+    if (!user) {
+      return response(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        401,
+        request,
+        env
+      );
+    }
+
+    return response(
+      {
+        success: true,
+        user: publicUser(user),
+        wallet: {
+          coins: Number(user.coins || 0),
+        },
+      },
+      200,
+      request,
+      env
+    );
+  }
+
+  /*
+   * FEED
+   */
+  if (path === "/api/feed" && method === "GET") {
+    const limit = Math.min(
+      50,
+      Math.max(
+        1,
+        Number(url.searchParams.get("limit") || 20)
+      )
+    );
+
+    const cursor = Math.max(
+      0,
+      Number(url.searchParams.get("cursor") || 0)
+    );
+
+    try {
+      const result = await env.DB.prepare(
+        `
+        SELECT
+          v.*,
+          u.username,
+          u.display_name,
+          u.avatar_url
+        FROM videos v
+        LEFT JOIN users u
+          ON u.id = v.user_id
+        ORDER BY v.created_at DESC
+        LIMIT ? OFFSET ?
+        `
+      )
+        .bind(limit, cursor)
+        .all();
+
+      const items = (result.results || []).map(
+        (video: any) => ({
+          id: String(video.id || ""),
+          userId: String(video.user_id || ""),
+          username: String(video.username || ""),
+          displayName: String(video.display_name || ""),
+          avatar: video.avatar_url || null,
+          videoUrl: String(video.video_url || ""),
+          thumbnailUrl: video.thumbnail_url || null,
+          caption: String(video.caption || ""),
+          musicName: video.music_name || null,
+          likes: Number(video.likes || 0),
+          comments: Number(video.comments || 0),
+          shares: Number(video.shares || 0),
+          views: Number(video.views || 0),
+          liked: false,
+          createdAt: video.created_at || null,
+        })
+      );
+
+      return response(
+        {
+          success: true,
+          items,
+          nextCursor: cursor + items.length,
+        },
+        200,
+        request,
+        env
+      );
+    } catch (error) {
+      return response(
+        {
+          success: false,
+          items: [],
+          message: String(error),
+        },
+        500,
+        request,
+        env
+      );
+    }
+  }
+
+  /*
+   * CREATE VIDEO
+   */
+  if (path === "/api/videos" && method === "POST") {
+    const user = await getUser(request, env);
+
+    if (!user) {
+      return response(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        401,
+        request,
+        env
+      );
+    }
+
+    const body: any = await request
+      .json()
+      .catch(() => ({}));
+
+    const videoUrl = String(body.url || "").trim();
+    const caption = String(body.caption || "").trim();
+    const streamId = body.streamId
+      ? String(body.streamId)
+      : null;
+
+    if (!videoUrl && !streamId) {
+      return response(
+        {
+          success: false,
+          message: "Video URL is required",
+        },
+        400,
+        request,
+        env
+      );
+    }
+
+    const videoId = id("video");
+
+    await env.DB.prepare(
+      `
+      INSERT INTO videos
+      (
+        id,
+        user_id,
+        video_url,
+        stream_id,
+        caption,
+        likes,
+        comments,
+        shares,
+        views,
+        created_at
+      )
+      VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?)
+      `
+    )
+      .bind(
+        videoId,
+        user.id,
+        videoUrl,
+        streamId,
+        caption,
+        now()
+      )
+      .run();
+
+    return response(
+      {
+        success: true,
+        id: videoId,
+        message: "Video created",
+      },
+      201,
+      request,
+      env
+    );
+  }
+
+  /*
+   * LIKE / UNLIKE
+   */
+  const likeMatch = path.match(
+    /^\/api\/videos\/([^/]+)\/like$/
+  );
+
+  if (likeMatch && method === "POST") {
+    const user = await getUser(request, env);
+
+    if (!user) {
+      return response(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        401,
+        request,
+        env
+      );
+    }
+
+    const videoId = likeMatch[1];
+
+    try {
+      await env.DB.prepare(
+        `
+        INSERT OR IGNORE INTO likes
+        (
+          id,
+          user_id,
+          video_id,
+          created_at
+        )
+        VALUES (?, ?, ?, ?)
+        `
+      )
+        .bind(
+          id("like"),
+          user.id,
+          videoId,
+          now()
+        )
+        .run();
+
+      await env.DB.prepare(
+        `
+        UPDATE videos
+        SET likes =
+          (
+            SELECT COUNT(*)
+            FROM likes
+            WHERE video_id = ?
+          )
+        WHERE id = ?
+        `
+      )
+        .bind(videoId, videoId)
+        .run();
+
+      return response(
+        {
+          success: true,
+          liked: true,
+        },
+        200,
+        request,
+        env
+      );
+    } catch (error) {
+      return response(
+        {
+          success: false,
+          message: String(error),
+        },
+        500,
+        request,
+        env
+      );
+    }
+  }
+
+  const unlikeMatch = path.match(
+    /^\/api\/videos\/([^/]+)\/like$/
+  );
+
+  if (unlikeMatch && method === "DELETE") {
+    const user = await getUser(request, env);
+
+    if (!user) {
+      return response(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        401,
+        request,
+        env
+      );
+    }
+
+    const videoId = unlikeMatch[1];
+
+    await env.DB.prepare(
+      `
+      DELETE FROM likes
+      WHERE user_id = ?
+      AND video_id = ?
+      `
+    )
+      .bind(user.id, videoId)
+      .run();
+
+    await env.DB.prepare(
+      `
+      UPDATE videos
+      SET likes =
+        (
+          SELECT COUNT(*)
+          FROM likes
+          WHERE video_id = ?
+        )
+      WHERE id = ?
+      `
+    )
+      .bind(videoId, videoId)
+      .run();
+
+    return response(
+      {
+        success: true,
+        liked: false,
+      },
+      200,
+      request,
+      env
+    );
+  }
+
+  /*
+   * COMMENTS
+   */
+  const commentsMatch = path.match(
+    /^\/api\/videos\/([^/]+)\/comments$/
+  );
+
+  if (commentsMatch && method === "GET") {
+    const videoId = commentsMatch[1];
+
+    const limit = Math.min(
+      100,
+      Math.max(
+        1,
+        Number(url.searchParams.get("limit") || 30)
+      )
+    );
+
+    const result = await env.DB.prepare(
+      `
+      SELECT
+        c.*,
+        u.username,
+        u.display_name,
+        u.avatar_url
+      FROM comments c
+      LEFT JOIN users u
+        ON u.id = c.user_id
+      WHERE c.video_id = ?
+      ORDER BY c.created_at DESC
+      LIMIT ?
+      `
+    )
+      .bind(videoId, limit)
+      .all();
+
+    return response(
+      {
+        success: true,
+        items: (result.results || []).map(
+          (comment: any) => ({
+            id: String(comment.id || ""),
+            videoId: String(comment.video_id || ""),
+            userId: String(comment.user_id || ""),
+            username: String(comment.username || ""),
+            displayName: String(
+              comment.display_name || ""
+            ),
+            avatar: comment.avatar_url || null,
+            text: String(comment.text || ""),
+            createdAt: comment.created_at || null,
+          })
+        ),
+      },
+      200,
+      request,
+      env
+    );
+  }
+
+  if (commentsMatch && method === "POST") {
+    const user = await getUser(request, env);
+
+    if (!user) {
+      return response(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        401,
+        request,
+        env
+      );
+    }
+
+    const videoId = commentsMatch[1];
+
+    const body: any = await request
+      .json()
+      .catch(() => ({}));
+
+    const text = String(body.text || "").trim();
+
+    if (!text) {
+      return response(
+        {
+          success: false,
+          message: "Comment cannot be empty",
+        },
+        400,
+        request,
+        env
+      );
+    }
+
+    const commentId = id("comment");
+
+    await env.DB.prepare(
+      `
+      INSERT INTO comments
+      (
+        id,
+        video_id,
+        user_id,
+        text,
+        created_at
+      )
+      VALUES (?, ?, ?, ?, ?)
+      `
+    )
+      .bind(
+        commentId,
+        videoId,
+        user.id,
+        text.substring(0, 1000),
+        now()
+      )
+      .run();
+
+    await env.DB.prepare(
+      `
+      UPDATE videos
+      SET comments =
+        (
+          SELECT COUNT(*)
+          FROM comments
+          WHERE video_id = ?
+        )
+      WHERE id = ?
+      `
+    )
+      .bind(videoId, videoId)
+      .run();
+
+    return response(
+      {
+        success: true,
+        id: commentId,
+        message: "Comment added",
+      },
+      201,
+      request,
+      env
+    );
+  }
+
+  /*
+   * FOLLOW
+   */
+  const followMatch = path.match(
+    /^\/api\/users\/([^/]+)\/follow$/
+  );
+
+  if (followMatch && method === "POST") {
+    const user = await getUser(request, env);
+
+    if (!user) {
+      return response(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        401,
+        request,
+        env
+      );
+    }
+
+    const target = await env.DB.prepare(
+      `
+      SELECT *
+      FROM users
+      WHERE id = ?
+      OR username = ?
+      LIMIT 1
+      `
+    )
+      .bind(
+        followMatch[1],
+        followMatch[1]
+      )
+      .first();
+
+    if (!target) {
+      return response(
+        {
+          success: false,
+          message: "User not found",
+        },
+        404,
+        request,
+        env
+      );
+    }
+
+    if (target.id === user.id) {
+      return response(
+        {
+          success: false,
+          message: "Cannot follow yourself",
+        },
+        400,
+        request,
+        env
+      );
+    }
+
+    await env.DB.prepare(
+      `
+      INSERT OR IGNORE INTO follows
+      (
+        follower_id,
+        following_id,
+        created_at
+      )
+      VALUES (?, ?, ?)
+      `
+    )
+      .bind(
+        user.id,
+        target.id,
+        now()
+      )
+      .run();
+
+    await env.DB.prepare(
+      `
+      UPDATE users
+      SET following =
+        (
+          SELECT COUNT(*)
+          FROM follows
+          WHERE follower_id = ?
+        )
+      WHERE id = ?
+      `
+    )
+      .bind(user.id, user.id)
+      .run();
+
+    await env.DB.prepare(
+      `
+      UPDATE users
+      SET followers =
+        (
+          SELECT COUNT(*)
+          FROM follows
+          WHERE following_id = ?
+        )
+      WHERE id = ?
+      `
+    )
+      .bind(target.id, target.id)
+      .run();
+
+    return response(
+      {
+        success: true,
+        following: true,
+      },
+      200,
+      request,
+      env
+    );
+  }
+
+  if (followMatch && method === "DELETE") {
+    const user = await getUser(request, env);
+
+    if (!user) {
+      return response(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        401,
+        request,
+        env
+      );
+    }
+
+    const target = await env.DB.prepare(
+      `
+      SELECT *
+      FROM users
+      WHERE id = ?
+      OR username = ?
+      LIMIT 1
+      `
+    )
+      .bind(
+        followMatch[1],
+        followMatch[1]
+      )
+      .first();
+
+    if (!target) {
+      return response(
+        {
+          success: false,
+          message: "User not found",
+        },
+        404,
+        request,
+        env
+      );
+    }
+
+    await env.DB.prepare(
+      `
+      DELETE FROM follows
+      WHERE follower_id = ?
+      AND following_id = ?
+      `
+    )
+      .bind(user.id, target.id)
+      .run();
+
+    return response(
+      {
+        success: true,
+        following: false,
+      },
+      200,
+      request,
+      env
+    );
+  }
+
+  /*
+   * PROFILE UPDATE
+   */
+  if (path === "/api/profile" && method === "PATCH") {
+    const user = await getUser(request, env);
+
+    if (!user) {
+      return response(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        401,
+        request,
+        env
+      );
+    }
+
+    const body: any = await request
+      .json()
+      .catch(() => ({}));
+
+    const displayName =
+      body.displayName !== undefined
+        ? String(body.displayName).trim()
+        : user.display_name;
+
+    const bio =
+      body.bio !== undefined
+        ? String(body.bio).trim()
+        : user.bio;
+
+    const avatarUrl =
+      body.avatarUrl !== undefined
+        ? String(body.avatarUrl).trim()
+        : user.avatar_url;
+
+    await env.DB.prepare(
+      `
+      UPDATE users
+      SET
+        display_name = ?,
+        bio = ?,
+        avatar_url = ?,
+        updated_at = ?
+      WHERE id = ?
+      `
+    )
+      .bind(
+        displayName,
+        bio,
+        avatarUrl,
+        now(),
+        user.id
+      )
+      .run();
+
+    return response(
+      {
+        success: true,
+        user: publicUser({
+          ...user,
+          display_name: displayName,
+          bio,
+          avatar_url: avatarUrl,
+        }),
+      },
+      200,
+      request,
+      env
+    );
+  }
+
+  /*
+   * GIFTS
+   */
+  if (path === "/api/gifts" && method === "GET") {
+    try {
+      await ensureGifts(env);
+
+      const result = await env.DB.prepare(
+        `
+        SELECT *
+        FROM gifts
+        WHERE enabled = 1
+        ORDER BY price ASC
+        `
+      ).all();
+
+      return response(
+        {
+          success: true,
+          items: (result.results || []).map(
+            publicGift
+          ),
+        },
+        200,
+        request,
+        env
+      );
+    } catch {
+      return response(
+        {
+          success: true,
+          items: DEFAULT_GIFTS,
+        },
+        200,
+        request,
+        env
+      );
+    }
+  }
+
+  /*
+   * CREATE LIVE
+   */
+  if (path === "/api/live/create" && method === "POST") {
+    const user = await getUser(request, env);
+
+    if (!user) {
+      return response(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        401,
+        request,
+        env
+      );
+    }
+
+    const body: any = await request
+      .json()
+      .catch(() => ({}));
+
+    const title =
+      String(body.title || "Wave Live").trim();
+
+    if (!title) {
+      return response(
+        {
+          success: false,
+          message: "Live title is required",
+        },
+        400,
+        request,
+        env
+      );
+    }
+
+    const liveId = id("live");
+
+    const streamKey =
+      crypto.randomUUID().replace(/-/g, "") +
+      crypto.randomUUID().replace(/-/g, "");
+
+    await env.DB.prepare(
+      `
+      INSERT INTO live_streams
+      (
+        id,
+        user_id,
+        title,
+        stream_key,
+        viewer_count,
+        likes,
+        status,
+        started_at,
+        created_at
+      )
+      VALUES (?, ?, ?, ?, 0, 0, 'active', ?, ?)
+      `
+    )
+      .bind(
+        liveId,
+        user.id,
+        title,
+        streamKey,
+        now(),
+        now()
+      )
+      .run();
+
+    return response(
+      {
+        success: true,
+        message: "Live created",
+        live: publicLive({
+          id: liveId,
+          user_id: user.id,
+          username: user.username,
+          display_name: user.display_name,
+          avatar_url: user.avatar_url,
+          title,
+          stream_key: streamKey,
+          viewer_count: 0,
+          likes: 0,
+          status: "active",
+          started_at: now(),
+        }),
+      },
+      201,
+      request,
+      env
+    );
+  }
+
+  /*
+   * GET LIVE
+   */
+  const liveMatch = path.match(
+    /^\/api\/live\/([^/]+)$/
+  );
+
+  if (liveMatch && method === "GET") {
+    const live = await env.DB.prepare(
+      `
+      SELECT
+        l.*,
+        u.username,
+        u.display_name,
+        u.avatar_url
+      FROM live_streams l
+      LEFT JOIN users u
+        ON u.id = l.user_id
+      WHERE l.id = ?
+      LIMIT 1
+      `
+    )
+      .bind(liveMatch[1])
+      .first();
+
+    if (!live) {
+      return response(
+        {
+          success: false,
+          message: "Live not found",
+        },
+        404,
+        request,
+        env
+      );
+    }
+
+    return response(
+      {
+        success: true,
+        live: publicLive(live),
+      },
+      200,
+      request,
+      env
+    );
+  }
+
+  /*
+   * UPDATE LIVE
+   */
+  if (liveMatch && method === "PATCH") {
+    const user = await getUser(request, env);
+
+    if (!user) {
+      return response(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        401,
+        request,
+        env
+      );
+    }
+
+    const live = await env.DB.prepare(
+      `
+      SELECT *
+      FROM live_streams
+      WHERE id = ?
+      LIMIT 1
+      `
+    )
+      .bind(liveMatch[1])
+      .first();
+
+    if (!live || live.user_id !== user.id) {
+      return response(
+        {
+          success: false,
+          message: "Live not found",
+        },
+        404,
+        request,
+        env
+      );
+    }
+
+    const body: any = await request
+      .json()
+      .catch(() => ({}));
+
+    const status =
+      body.status !== undefined
+        ? String(body.status)
+        : live.status;
+
+    const title =
+      body.title !== undefined
+        ? String(body.title)
+        : live.title;
+
+    await env.DB.prepare(
+      `
+      UPDATE live_streams
+      SET
+        status = ?,
+        title = ?
+      WHERE id = ?
+      `
+    )
+      .bind(
+        status,
+        title,
+        liveMatch[1]
+      )
+      .run();
+
+    return response(
+      {
+        success: true,
+        message: "Live updated",
+      },
+      200,
+      request,
+      env
+    );
+  }
+
+  /*
+   * SEND GIFT
+   */
+  const giftMatch = path.match(
+    /^\/api\/live\/([^/]+)\/gifts$/
+  );
+
+  if (giftMatch && method === "POST") {
+    const user = await getUser(request, env);
+
+    if (!user) {
+      return response(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        401,
+        request,
+        env
+      );
+    }
+
+    const liveId = giftMatch[1];
+
+    const body: any = await request
+      .json()
+      .catch(() => ({}));
+
+    const giftId = String(body.giftId || "");
+    const quantity = Math.max(
+      1,
+      Math.min(
+        100,
+        Number(body.quantity || 1)
+      )
+    );
+
+    if (!giftId) {
+      return response(
+        {
+          success: false,
+          message: "Gift ID is required",
+        },
+        400,
+        request,
+        env
+      );
+    }
+
+    const gift = await env.DB.prepare(
+      `
+      SELECT *
+      FROM gifts
+      WHERE id = ?
+      AND enabled = 1
+      LIMIT 1
+      `
+    )
+      .bind(giftId)
+      .first();
+
+    if (!gift) {
+      return response(
+        {
+          success: false,
+          message: "Gift not found",
+        },
+        404,
+        request,
+        env
+      );
+    }
+
+    const live = await env.DB.prepare(
+      `
+      SELECT *
+      FROM live_streams
+      WHERE id = ?
+      LIMIT 1
+      `
+    )
+      .bind(liveId)
+      .first();
+
+    if (!live) {
+      return response(
+        {
+          success: false,
+          message: "Live not found",
+        },
+        404,
+        request,
+        env
+      );
+    }
+
+    const total =
+      Number(gift.price || 0) * quantity;
+
+    const currentCoins =
+      Number(user.coins || 0);
+
+    if (currentCoins < total) {
+      return response(
+        {
+          success: false,
+          message: "Not enough Wave Coins",
+          remainingCoins: currentCoins,
+        },
+        400,
+        request,
+        env
+      );
+    }
+
+    const receiverUserId =
+      body.receiverUserId
+        ? String(body.receiverUserId)
+        : String(live.user_id);
+
+    const transactionId = id("gift_tx");
+
+    await env.DB.prepare(
+      `
+      UPDATE users
+      SET coins = coins - ?
+      WHERE id = ?
+      AND coins >= ?
+      `
+    )
+      .bind(
+        total,
+        user.id,
+        total
+      )
+      .run();
+
+    await env.DB.prepare(
+      `
+      INSERT INTO gift_transactions
+      (
+        id,
+        live_id,
+        sender_user_id,
+        receiver_user_id,
+        gift_id,
+        quantity,
+        total_coins,
+        created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+      .bind(
+        transactionId,
+        liveId,
+        user.id,
+        receiverUserId,
+        gift.id,
+        quantity,
+        total,
+        now()
+      )
+      .run();
+
+    return response(
+      {
+        success: true,
+        message: "Gift sent",
+        remainingCoins:
+          currentCoins - total,
+        gift: publicGift(gift),
+      },
+      200,
+      request,
+      env
+    );
+  }
+
+  /*
+   * DIRECT UPLOAD
+   *
+   * Placeholder endpoint.
+   * Actual Cloudflare Stream direct-upload credentials
+   * should be added through Worker secrets.
+   */
+  if (
+    path === "/api/upload/direct" &&
+    method === "POST"
+  ) {
+    const user = await getUser(request, env);
+
+    if (!user) {
+      return response(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        401,
+        request,
+        env
+      );
+    }
+
+    return response(
+      {
+        success: false,
+        message:
+          "Cloudflare Stream upload credentials are not configured yet.",
+      },
+      501,
+      request,
+      env
+    );
+  }
+
+  /*
+   * FALLBACK
+   */
+  return response(
+    {
+      success: false,
+      message: "Not Found",
+      path,
+    },
+    404,
+    request,
+    env
   );
 }
 
@@ -118,1875 +1629,20 @@ export default {
     request: Request,
     env: Env
   ): Promise<Response> {
-
-    if (request.method === "OPTIONS") {
-      return cors(
-        new Response(null, { status: 204 }),
-        env
-      );
-    }
-
-    const url = new URL(request.url);
-
     try {
-
-      /*
-       * HEALTH
-       */
-
-      if (
-        url.pathname === "/health" &&
-        request.method === "GET"
-      ) {
-        return out(
-          {
-            ok: true,
-            service: "vyro-api",
-            version: "1.0.0",
-            environment: env.ENVIRONMENT ?? "unknown",
-          },
-          200,
-          env
-        );
-      }
-
-      /*
-       * CREATE SESSION
-       */
-
-      if (
-        url.pathname === "/api/session" &&
-        request.method === "POST"
-      ) {
-        const userId = crypto.randomUUID();
-
-        const token =
-          crypto.randomUUID() +
-          crypto.randomUUID();
-
-        const now = new Date();
-
-        const days = Math.min(
-          Math.max(
-            Number(env.SESSION_DAYS ?? 30),
-            1
-          ),
-          90
-        );
-
-        const expires = new Date(
-          now.getTime() +
-            days * 86400000
-        ).toISOString();
-
-        const user = createUsername();
-
-        await env.DB.batch([
-          env.DB
-            .prepare(
-              `INSERT INTO users
-              (
-                id,
-                username,
-                display_name,
-                bio,
-                avatar_url,
-                created_at
-              )
-              VALUES (?, ?, ?, ?, ?, ?)`
-            )
-            .bind(
-              userId,
-              user,
-              "",
-              "",
-              "",
-              now.toISOString()
-            ),
-
-          env.DB
-            .prepare(
-              `INSERT INTO sessions
-              (
-                token,
-                user_id,
-                created_at,
-                expires_at
-              )
-              VALUES (?, ?, ?, ?)`
-            )
-            .bind(
-              token,
-              userId,
-              now.toISOString(),
-              expires
-            ),
-
-          env.DB
-            .prepare(
-              `INSERT INTO wallets
-              (
-                user_id,
-                coins,
-                updated_at
-              )
-              VALUES (?, ?, ?)`
-            )
-            .bind(
-              userId,
-              0,
-              now.toISOString()
-            ),
-        ]);
-
-        return out(
-          {
-            token,
-
-            user: {
-              id: userId,
-              username: user,
-              displayName: "",
-              bio: "",
-              avatarUrl: "",
-            },
-
-            wallet: {
-              coins: 0,
-            },
-
-            expiresAt: expires,
-          },
-          201,
-          env
-        );
-      }
-
-      const userId = await auth(request, env);
-
-      /*
-       * CURRENT USER
-       */
-
-      if (
-        url.pathname === "/api/me" &&
-        request.method === "GET"
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        const user = await env.DB
-          .prepare(
-            `SELECT
-              id,
-              username,
-              display_name AS displayName,
-              bio,
-              avatar_url AS avatarUrl,
-              created_at
-             FROM users
-             WHERE id = ?`
-          )
-          .bind(userId)
-          .first();
-
-        if (!user) {
-          return out(
-            { error: "user not found" },
-            404,
-            env
-          );
-        }
-
-        const wallet = await env.DB
-          .prepare(
-            `SELECT coins
-             FROM wallets
-             WHERE user_id = ?`
-          )
-          .bind(userId)
-          .first<{ coins: number }>();
-
-        return out(
-          {
-            user,
-            wallet: {
-              coins: wallet?.coins ?? 0,
-            },
-          },
-          200,
-          env
-        );
-      }
-
-      /*
-       * FEED
-       */
-
-      if (
-        url.pathname === "/api/feed" &&
-        request.method === "GET"
-      ) {
-        const limit = Math.min(
-          Math.max(
-            Number(
-              url.searchParams.get("limit") ?? 20
-            ),
-            1
-          ),
-          50
-        );
-
-        const cursor = Math.max(
-          Number(
-            url.searchParams.get("cursor") ?? 0
-          ),
-          0
-        );
-
-        const rows = await env.DB
-          .prepare(
-            `SELECT
-              v.id,
-              v.url,
-              v.user,
-              v.caption,
-              v.likes,
-              v.created_at
-             FROM videos v
-             LEFT JOIN users u
-               ON u.username = v.user
-             WHERE
-               u.id IS NULL
-               OR NOT EXISTS (
-                 SELECT 1
-                 FROM blocks b
-                 WHERE b.blocker_id = ?
-                 AND b.blocked_id = u.id
-               )
-             ORDER BY v.created_at DESC
-             LIMIT ?
-             OFFSET ?`
-          )
-          .bind(
-            userId ?? "",
-            limit,
-            cursor
-          )
-          .all<VideoRow>();
-
-        return out(
-          {
-            items: rows.results,
-
-            nextCursor:
-              rows.results.length === limit
-                ? cursor + rows.results.length
-                : null,
-          },
-          200,
-          env
-        );
-      }
-
-      /*
-       * CREATE VIDEO
-       */
-
-      if (
-        url.pathname === "/api/videos" &&
-        request.method === "POST"
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        const body =
-          (await request.json()) as {
-            url?: unknown;
-            streamId?: unknown;
-            caption?: unknown;
-          };
-
-        let playback =
-          typeof body.url === "string"
-            ? body.url.trim()
-            : "";
-
-        if (
-          !playback &&
-          typeof body.streamId === "string" &&
-          env.STREAM_CUSTOMER_SUBDOMAIN
-        ) {
-          playback =
-            `https://${env.STREAM_CUSTOMER_SUBDOMAIN}` +
-            `.cloudflarestream.com/` +
-            `${encodeURIComponent(body.streamId)}` +
-            `/manifest/video.m3u8`;
-        }
-
-        if (!playback) {
-          return out(
-            {
-              error:
-                "url or streamId is required",
-            },
-            400,
-            env
-          );
-        }
-
-        const user = await env.DB
-          .prepare(
-            `SELECT username AS user
-             FROM users
-             WHERE id = ?`
-          )
-          .bind(userId)
-          .first<{ user: string }>();
-
-        const id = crypto.randomUUID();
-
-        const now =
-          new Date().toISOString();
-
-        const caption =
-          typeof body.caption === "string"
-            ? body.caption.trim().slice(0, 500)
-            : "";
-
-        await env.DB
-          .prepare(
-            `INSERT INTO videos
-            (
-              id,
-              url,
-              user,
-              caption,
-              likes,
-              created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)`
-          )
-          .bind(
-            id,
-            playback,
-            user?.user ?? "user",
-            caption,
-            0,
-            now
-          )
-          .run();
-
-        return out(
-          {
-            id,
-            url: playback,
-            user: user?.user ?? "user",
-            caption,
-            likes: 0,
-            created_at: now,
-          },
-          201,
-          env
-        );
-      }
-
-      /*
-       * VIDEO LIKE
-       */
-
-      const likeMatch =
-        url.pathname.match(
-          /^\/api\/videos\/([^/]+)\/like$/
-        );
-
-      if (
-        likeMatch &&
-        request.method === "POST"
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        const videoId = likeMatch[1];
-
-        const video = await env.DB
-          .prepare(
-            `SELECT id
-             FROM videos
-             WHERE id = ?`
-          )
-          .bind(videoId)
-          .first();
-
-        if (!video) {
-          return out(
-            { error: "video not found" },
-            404,
-            env
-          );
-        }
-
-        const result = await env.DB
-          .prepare(
-            `INSERT OR IGNORE INTO video_likes
-            (
-              video_id,
-              user_id,
-              created_at
-            )
-            VALUES (?, ?, ?)`
-          )
-          .bind(
-            videoId,
-            userId,
-            new Date().toISOString()
-          )
-          .run();
-
-        if (result.meta.changes) {
-          await env.DB
-            .prepare(
-              `UPDATE videos
-               SET likes = likes + 1
-               WHERE id = ?`
-            )
-            .bind(videoId)
-            .run();
-        }
-
-        const row = await env.DB
-          .prepare(
-            `SELECT likes
-             FROM videos
-             WHERE id = ?`
-          )
-          .bind(videoId)
-          .first<{ likes: number }>();
-
-        return out(
-          {
-            id: videoId,
-            likes: row?.likes ?? 0,
-            liked: true,
-          },
-          200,
-          env
-        );
-      }
-
-      if (
-        likeMatch &&
-        request.method === "DELETE"
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        const videoId = likeMatch[1];
-
-        const result = await env.DB
-          .prepare(
-            `DELETE FROM video_likes
-             WHERE video_id = ?
-             AND user_id = ?`
-          )
-          .bind(
-            videoId,
-            userId
-          )
-          .run();
-
-        if (result.meta.changes) {
-          await env.DB
-            .prepare(
-              `UPDATE videos
-               SET likes = MAX(likes - 1, 0)
-               WHERE id = ?`
-            )
-            .bind(videoId)
-            .run();
-        }
-
-        const row = await env.DB
-          .prepare(
-            `SELECT likes
-             FROM videos
-             WHERE id = ?`
-          )
-          .bind(videoId)
-          .first<{ likes: number }>();
-
-        return out(
-          {
-            id: videoId,
-            likes: row?.likes ?? 0,
-            liked: false,
-          },
-          200,
-          env
-        );
-      }
-
-      /*
-       * FOLLOW / UNFOLLOW
-       */
-
-      const followMatch =
-        url.pathname.match(
-          /^\/api\/users\/([^/]+)\/follow$/
-        );
-
-      if (
-        followMatch &&
-        (
-          request.method === "POST" ||
-          request.method === "DELETE"
-        )
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        const target = await env.DB
-          .prepare(
-            `SELECT id
-             FROM users
-             WHERE id = ?
-             OR username = ?`
-          )
-          .bind(
-            followMatch[1],
-            followMatch[1]
-          )
-          .first<{ id: string }>();
-
-        if (!target) {
-          return out(
-            { error: "user not found" },
-            404,
-            env
-          );
-        }
-
-        if (target.id === userId) {
-          return out(
-            {
-              error:
-                "cannot follow yourself",
-            },
-            400,
-            env
-          );
-        }
-
-        if (request.method === "POST") {
-          await env.DB
-            .prepare(
-              `INSERT OR IGNORE INTO follows
-              (
-                follower_id,
-                following_id,
-                created_at
-              )
-              VALUES (?, ?, ?)`
-            )
-            .bind(
-              userId,
-              target.id,
-              new Date().toISOString()
-            )
-            .run();
-        } else {
-          await env.DB
-            .prepare(
-              `DELETE FROM follows
-               WHERE follower_id = ?
-               AND following_id = ?`
-            )
-            .bind(
-              userId,
-              target.id
-            )
-            .run();
-        }
-
-        return out(
-          {
-            following:
-              request.method === "POST",
-
-            userId: target.id,
-          },
-          200,
-          env
-        );
-      }
-
-      /*
-       * PROFILE UPDATE
-       */
-
-      if (
-        url.pathname === "/api/profile" &&
-        request.method === "PATCH"
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        const body =
-          (await request.json()) as {
-            displayName?: unknown;
-            bio?: unknown;
-            avatarUrl?: unknown;
-          };
-
-        const displayName =
-          typeof body.displayName === "string"
-            ? body.displayName.trim().slice(0, 80)
-            : null;
-
-        const bio =
-          typeof body.bio === "string"
-            ? body.bio.trim().slice(0, 500)
-            : null;
-
-        const avatarUrl =
-          typeof body.avatarUrl === "string"
-            ? body.avatarUrl.trim().slice(0, 500)
-            : null;
-
-        await env.DB
-          .prepare(
-            `UPDATE users
-             SET
-               display_name =
-                 COALESCE(?, display_name),
-               bio =
-                 COALESCE(?, bio),
-               avatar_url =
-                 COALESCE(?, avatar_url)
-             WHERE id = ?`
-          )
-          .bind(
-            displayName,
-            bio,
-            avatarUrl,
-            userId
-          )
-          .run();
-
-        const user = await env.DB
-          .prepare(
-            `SELECT
-              id,
-              username,
-              display_name AS displayName,
-              bio,
-              avatar_url AS avatarUrl
-             FROM users
-             WHERE id = ?`
-          )
-          .bind(userId)
-          .first();
-
-        return out(
-          { user },
-          200,
-          env
-        );
-      }
-
-      /*
-       * COMMENTS
-       */
-
-      const commentsMatch =
-        url.pathname.match(
-          /^\/api\/videos\/([^/]+)\/comments$/
-        );
-
-      if (
-        commentsMatch &&
-        request.method === "GET"
-      ) {
-        const limit = Math.min(
-          Math.max(
-            Number(
-              url.searchParams.get("limit") ?? 30
-            ),
-            1
-          ),
-          100
-        );
-
-        const rows = await env.DB
-          .prepare(
-            `SELECT
-              c.id,
-              c.text,
-              c.created_at,
-              u.username AS user,
-              u.avatar_url AS avatarUrl
-             FROM comments c
-             JOIN users u
-               ON u.id = c.user_id
-             WHERE c.video_id = ?
-             ORDER BY c.created_at DESC
-             LIMIT ?`
-          )
-          .bind(
-            commentsMatch[1],
-            limit
-          )
-          .all();
-
-        return out(
-          {
-            items: rows.results,
-          },
-          200,
-          env
-        );
-      }
-
-      if (
-        commentsMatch &&
-        request.method === "POST"
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        const body =
-          (await request.json()) as {
-            text?: unknown;
-          };
-
-        if (
-          typeof body.text !== "string" ||
-          !body.text.trim() ||
-          body.text.length > 500
-        ) {
-          return out(
-            {
-              error:
-                "comment must be 1-500 chars",
-            },
-            400,
-            env
-          );
-        }
-
-        const video = await env.DB
-          .prepare(
-            `SELECT id
-             FROM videos
-             WHERE id = ?`
-          )
-          .bind(commentsMatch[1])
-          .first();
-
-        if (!video) {
-          return out(
-            { error: "video not found" },
-            404,
-            env
-          );
-        }
-
-        const id = crypto.randomUUID();
-
-        const now =
-          new Date().toISOString();
-
-        const text =
-          body.text.trim();
-
-        await env.DB
-          .prepare(
-            `INSERT INTO comments
-            (
-              id,
-              video_id,
-              user_id,
-              text,
-              created_at
-            )
-            VALUES (?, ?, ?, ?, ?)`
-          )
-          .bind(
-            id,
-            commentsMatch[1],
-            userId,
-            text,
-            now
-          )
-          .run();
-
-        const user = await env.DB
-          .prepare(
-            `SELECT
-              username AS user,
-              avatar_url AS avatarUrl
-             FROM users
-             WHERE id = ?`
-          )
-          .bind(userId)
-          .first();
-
-        return out(
-          {
-            id,
-            text,
-            created_at: now,
-            ...user,
-          },
-          201,
-          env
-        );
-      }
-
-      /*
-       * ACCOUNT DELETE
-       */
-
-      if (
-        url.pathname === "/api/account" &&
-        request.method === "DELETE"
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        await env.DB.batch([
-          env.DB
-            .prepare(
-              `DELETE FROM comments
-               WHERE user_id = ?`
-            )
-            .bind(userId),
-
-          env.DB
-            .prepare(
-              `DELETE FROM video_likes
-               WHERE user_id = ?`
-            )
-            .bind(userId),
-
-          env.DB
-            .prepare(
-              `DELETE FROM follows
-               WHERE follower_id = ?
-               OR following_id = ?`
-            )
-            .bind(
-              userId,
-              userId
-            ),
-
-          env.DB
-            .prepare(
-              `DELETE FROM blocks
-               WHERE blocker_id = ?
-               OR blocked_id = ?`
-            )
-            .bind(
-              userId,
-              userId
-            ),
-
-          env.DB
-            .prepare(
-              `DELETE FROM reports
-               WHERE reporter_id = ?
-               OR reported_user_id = ?`
-            )
-            .bind(
-              userId,
-              userId
-            ),
-
-          env.DB
-            .prepare(
-              `DELETE FROM gift_transactions
-               WHERE sender_user_id = ?
-               OR receiver_user_id = ?`
-            )
-            .bind(
-              userId,
-              userId
-            ),
-
-          env.DB
-            .prepare(
-              `DELETE FROM wallets
-               WHERE user_id = ?`
-            )
-            .bind(userId),
-
-          env.DB
-            .prepare(
-              `DELETE FROM sessions
-               WHERE user_id = ?`
-            )
-            .bind(userId),
-
-          env.DB
-            .prepare(
-              `DELETE FROM users
-               WHERE id = ?`
-            )
-            .bind(userId),
-        ]);
-
-        return out(
-          { ok: true },
-          200,
-          env
-        );
-      }
-
-      /*
-       * BLOCK / UNBLOCK
-       */
-
-      const blockMatch =
-        url.pathname.match(
-          /^\/api\/users\/([^/]+)\/block$/
-        );
-
-      if (
-        blockMatch &&
-        (
-          request.method === "POST" ||
-          request.method === "DELETE"
-        )
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        const target = await env.DB
-          .prepare(
-            `SELECT id
-             FROM users
-             WHERE id = ?
-             OR username = ?`
-          )
-          .bind(
-            blockMatch[1],
-            blockMatch[1]
-          )
-          .first<{ id: string }>();
-
-        if (!target) {
-          return out(
-            { error: "user not found" },
-            404,
-            env
-          );
-        }
-
-        if (target.id === userId) {
-          return out(
-            {
-              error:
-                "cannot block yourself",
-            },
-            400,
-            env
-          );
-        }
-
-        if (request.method === "POST") {
-          await env.DB
-            .prepare(
-              `INSERT OR IGNORE INTO blocks
-              (
-                blocker_id,
-                blocked_id,
-                created_at
-              )
-              VALUES (?, ?, ?)`
-            )
-            .bind(
-              userId,
-              target.id,
-              new Date().toISOString()
-            )
-            .run();
-        } else {
-          await env.DB
-            .prepare(
-              `DELETE FROM blocks
-               WHERE blocker_id = ?
-               AND blocked_id = ?`
-            )
-            .bind(
-              userId,
-              target.id
-            )
-            .run();
-        }
-
-        return out(
-          {
-            blocked:
-              request.method === "POST",
-
-            userId: target.id,
-          },
-          200,
-          env
-        );
-      }
-
-      /*
-       * REPORT
-       */
-
-      if (
-        url.pathname === "/api/reports" &&
-        request.method === "POST"
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        const body =
-          (await request.json()) as {
-            videoId?: unknown;
-            reportedUserId?: unknown;
-            reason?: unknown;
-            details?: unknown;
-          };
-
-        if (
-          typeof body.reason !== "string" ||
-          !body.reason.trim()
-        ) {
-          return out(
-            {
-              error: "reason is required",
-            },
-            400,
-            env
-          );
-        }
-
-        const id = crypto.randomUUID();
-
-        const now =
-          new Date().toISOString();
-
-        await env.DB
-          .prepare(
-            `INSERT INTO reports
-            (
-              id,
-              reporter_id,
-              video_id,
-              reported_user_id,
-              reason,
-              details,
-              created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?)`
-          )
-          .bind(
-            id,
-            userId,
-            typeof body.videoId === "string"
-              ? body.videoId
-              : null,
-            typeof body.reportedUserId === "string"
-              ? body.reportedUserId
-              : null,
-            body.reason.trim().slice(0, 100),
-            typeof body.details === "string"
-              ? body.details.trim().slice(0, 1000)
-              : "",
-            now
-          )
-          .run();
-
-        return out(
-          {
-            ok: true,
-            id,
-          },
-          201,
-          env
-        );
-      }
-
-      /*
-       * CLOUDFLARE DIRECT UPLOAD
-       */
-
-      if (
-        url.pathname === "/api/upload/direct" &&
-        request.method === "POST"
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        if (!isCloudflareConfigured(env)) {
-          return out(
-            {
-              error:
-                "Upload service is not configured",
-
-              code:
-                "CLOUDFLARE_NOT_CONFIGURED",
-            },
-            503,
-            env
-          );
-        }
-
-        const cloudflareResponse =
-          await fetch(
-            `https://api.cloudflare.com/client/v4/` +
-            `accounts/${env.CLOUDFLARE_ACCOUNT_ID}` +
-            `/stream/direct_upload`,
-            {
-              method: "POST",
-
-              headers:
-                cloudflareHeaders(env),
-
-              body: JSON.stringify({
-                maxDurationSeconds: 600,
-              }),
-            }
-          );
-
-        const payload =
-          await cloudflareResponse.json();
-
-        if (!cloudflareResponse.ok) {
-          return out(
-            {
-              error:
-                "Cloudflare upload creation failed",
-
-              details: payload,
-            },
-            502,
-            env
-          );
-        }
-
-        return out(
-          payload,
-          201,
-          env
-        );
-      }
-
-      /*
-       * GIFTS CATALOG
-       */
-
-      if (
-        url.pathname === "/api/gifts" &&
-        request.method === "GET"
-      ) {
-        const rows = await env.DB
-          .prepare(
-            `SELECT
-              id,
-              name,
-              icon,
-              price_coins AS priceCoins
-             FROM gift_catalog
-             WHERE active = 1
-             ORDER BY sort_order ASC`
-          )
-          .all<GiftRow>();
-
-        return out(
-          {
-            items: rows.results,
-          },
-          200,
-          env
-        );
-      }
-
-      /*
-       * LIVE DETAILS
-       */
-
-      const liveMatch =
-        url.pathname.match(
-          /^\/api\/live\/([^/]+)$/
-        );
-
-      if (
-        liveMatch &&
-        request.method === "GET"
-      ) {
-        const live = await env.DB
-          .prepare(
-            `SELECT
-              l.id,
-              l.title,
-              l.status,
-              l.created_at AS createdAt,
-              l.ended_at AS endedAt,
-              u.id AS hostUserId,
-              u.username AS host,
-              u.display_name AS hostDisplayName,
-              u.avatar_url AS hostAvatarUrl
-             FROM live_sessions l
-             JOIN users u
-               ON u.id = l.host_user_id
-             WHERE l.id = ?`
-          )
-          .bind(liveMatch[1])
-          .first();
-
-        if (!live) {
-          return out(
-            { error: "live not found" },
-            404,
-            env
-          );
-        }
-
-        return out(
-          {
-            live,
-          },
-          200,
-          env
-        );
-      }
-
-      /*
-       * UPDATE LIVE
-       */
-
-      if (
-        liveMatch &&
-        request.method === "PATCH"
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        const body =
-          (await request.json()) as {
-            status?: unknown;
-            title?: unknown;
-          };
-
-        const live = await env.DB
-          .prepare(
-            `SELECT
-              host_user_id
-             FROM live_sessions
-             WHERE id = ?`
-          )
-          .bind(liveMatch[1])
-          .first<{
-            host_user_id: string;
-          }>();
-
-        if (!live) {
-          return out(
-            { error: "live not found" },
-            404,
-            env
-          );
-        }
-
-        if (
-          live.host_user_id !== userId
-        ) {
-          return out(
-            { error: "forbidden" },
-            403,
-            env
-          );
-        }
-
-        const status =
-          typeof body.status === "string" &&
-          [
-            "created",
-            "live",
-            "ended",
-          ].includes(body.status)
-            ? body.status
-            : null;
-
-        const title =
-          typeof body.title === "string"
-            ? body.title.trim().slice(0, 120)
-            : null;
-
-        const endedAt =
-          status === "ended"
-            ? new Date().toISOString()
-            : null;
-
-        await env.DB
-          .prepare(
-            `UPDATE live_sessions
-             SET
-               status =
-                 COALESCE(?, status),
-               title =
-                 COALESCE(?, title),
-               ended_at =
-                 CASE
-                   WHEN ? = 'ended'
-                   THEN ?
-                   ELSE ended_at
-                 END
-             WHERE id = ?`
-          )
-          .bind(
-            status,
-            title,
-            status,
-            endedAt,
-            liveMatch[1]
-          )
-          .run();
-
-        return out(
-          {
-            ok: true,
-            liveId: liveMatch[1],
-            status,
-            title,
-          },
-          200,
-          env
-        );
-      }
-
-      /*
-       * SEND LIVE GIFT
-       */
-
-      const sendGiftMatch =
-        url.pathname.match(
-          /^\/api\/live\/([^/]+)\/gifts$/
-        );
-
-      if (
-        sendGiftMatch &&
-        request.method === "POST"
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        const body =
-          (await request.json()) as {
-            giftId?: unknown;
-            quantity?: unknown;
-            receiverUserId?: unknown;
-          };
-
-        const giftId =
-          typeof body.giftId === "string"
-            ? body.giftId.trim()
-            : "";
-
-        const quantityValue =
-          Number(body.quantity ?? 1);
-
-        if (
-          !giftId ||
-          !Number.isInteger(quantityValue) ||
-          quantityValue < 1
-        ) {
-          return out(
-            {
-              error:
-                "giftId and valid quantity are required",
-            },
-            400,
-            env
-          );
-        }
-
-        const quantity = Math.min(
-          quantityValue,
-          100
-        );
-
-        const live = await env.DB
-          .prepare(
-            `SELECT
-              host_user_id,
-              status
-             FROM live_sessions
-             WHERE id = ?`
-          )
-          .bind(sendGiftMatch[1])
-          .first<{
-            host_user_id: string;
-            status: string;
-          }>();
-
-        if (!live) {
-          return out(
-            { error: "live not found" },
-            404,
-            env
-          );
-        }
-
-        if (live.status !== "live") {
-          return out(
-            {
-              error:
-                "live is not active",
-            },
-            409,
-            env
-          );
-        }
-
-        const gift = await env.DB
-          .prepare(
-            `SELECT
-              id,
-              name,
-              icon,
-              price_coins AS priceCoins
-             FROM gift_catalog
-             WHERE id = ?
-             AND active = 1`
-          )
-          .bind(giftId)
-          .first<GiftRow>();
-
-        if (!gift) {
-          return out(
-            { error: "gift not found" },
-            404,
-            env
-          );
-        }
-
-        const receiver =
-          typeof body.receiverUserId === "string"
-            ? body.receiverUserId
-            : live.host_user_id;
-
-        if (
-          receiver !== live.host_user_id
-        ) {
-          return out(
-            {
-              error:
-                "receiver must be the live host",
-            },
-            400,
-            env
-          );
-        }
-
-        const total =
-          gift.priceCoins * quantity;
-
-        const wallet = await env.DB
-          .prepare(
-            `SELECT coins
-             FROM wallets
-             WHERE user_id = ?`
-          )
-          .bind(userId)
-          .first<{ coins: number }>();
-
-        const available =
-          wallet?.coins ?? 0;
-
-        if (available < total) {
-          return out(
-            {
-              error: "insufficient coins",
-              requiredCoins: total,
-              availableCoins: available,
-            },
-            402,
-            env
-          );
-        }
-
-        const transactionId =
-          crypto.randomUUID();
-
-        const now =
-          new Date().toISOString();
-
-        /*
-         * If sender and host are different:
-         * sender loses coins and host receives them.
-         *
-         * If sender is the host:
-         * the balance remains unchanged.
-         */
-
-        if (userId === receiver) {
-
-          await env.DB.batch([
-            env.DB
-              .prepare(
-                `INSERT INTO gift_transactions
-                (
-                  id,
-                  live_id,
-                  sender_user_id,
-                  receiver_user_id,
-                  gift_id,
-                  quantity,
-                  coins_total,
-                  created_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-              )
-              .bind(
-                transactionId,
-                sendGiftMatch[1],
-                userId,
-                receiver,
-                giftId,
-                quantity,
-                total,
-                now
-              ),
-          ]);
-
-        } else {
-
-          const senderUpdate =
-            await env.DB
-              .prepare(
-                `UPDATE wallets
-                 SET
-                   coins = coins - ?,
-                   updated_at = ?
-                 WHERE user_id = ?
-                 AND coins >= ?`
-              )
-              .bind(
-                total,
-                now,
-                userId,
-                total
-              );
-
-          const receiverUpdate =
-            env.DB
-              .prepare(
-                `UPDATE wallets
-                 SET
-                   coins = coins + ?,
-                   updated_at = ?
-                 WHERE user_id = ?`
-              )
-              .bind(
-                total,
-                now,
-                receiver
-              );
-
-          const transaction =
-            env.DB
-              .prepare(
-                `INSERT INTO gift_transactions
-                (
-                  id,
-                  live_id,
-                  sender_user_id,
-                  receiver_user_id,
-                  gift_id,
-                  quantity,
-                  coins_total,
-                  created_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-              )
-              .bind(
-                transactionId,
-                sendGiftMatch[1],
-                userId,
-                receiver,
-                giftId,
-                quantity,
-                total,
-                now
-              );
-
-          await env.DB.batch([
-            senderUpdate,
-            receiverUpdate,
-            transaction,
-          ]);
-        }
-
-        return out(
-          {
-            ok: true,
-
-            transactionId,
-
-            gift: {
-              id: gift.id,
-              name: gift.name,
-              icon: gift.icon,
-              priceCoins: gift.priceCoins,
-              quantity,
-            },
-
-            coinsSpent: total,
-
-            remainingCoins:
-              userId === receiver
-                ? available
-                : available - total,
-          },
-          201,
-          env
-        );
-      }
-
-      /*
-       * CREATE LIVE
-       */
-
-      if (
-        url.pathname === "/api/live/create" &&
-        request.method === "POST"
-      ) {
-        if (!userId) {
-          return out(
-            { error: "unauthorized" },
-            401,
-            env
-          );
-        }
-
-        if (!isCloudflareConfigured(env)) {
-          return out(
-            {
-              error:
-                "Live service is not configured",
-
-              code:
-                "CLOUDFLARE_NOT_CONFIGURED",
-            },
-            503,
-            env
-          );
-        }
-
-        const body =
-          (await request.json().catch(
-            () => ({})
-          )) as {
-            title?: unknown;
-          };
-
-        const cloudflareResponse =
-          await fetch(
-            `https://api.cloudflare.com/client/v4/` +
-            `accounts/${env.CLOUDFLARE_ACCOUNT_ID}` +
-            `/stream/live_inputs`,
-            {
-              method: "POST",
-
-              headers:
-                cloudflareHeaders(env),
-
-              body: JSON.stringify({
-                recording: {
-                  mode: "automatic",
-                },
-              }),
-            }
-          );
-
-        const payload =
-          await cloudflareResponse.json();
-
-        if (!cloudflareResponse.ok) {
-          return out(
-            {
-              error:
-                "Cloudflare live input creation failed",
-
-              details: payload,
-            },
-            502,
-            env
-          );
-        }
-
-        const result =
-          (payload as {
-            result?: {
-              uid?: string;
-              rtmps?: unknown;
-              webRTC?: unknown;
-            };
-          }).result;
-
-        if (!result?.uid) {
-          return out(
-            {
-              error:
-                "Cloudflare did not return a live input id",
-            },
-            502,
-            env
-          );
-        }
-
-        const liveId =
-          crypto.randomUUID();
-
-        const title =
-          typeof body.title === "string"
-            ? body.title.trim().slice(0, 120)
-            : "Wave Live";
-
-        const now =
-          new Date().toISOString();
-
-        await env.DB
-          .prepare(
-            `INSERT INTO live_sessions
-            (
-              id,
-              host_user_id,
-              title,
-              status,
-              cloudflare_input_id,
-              created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)`
-          )
-          .bind(
-            liveId,
-            userId,
-            title,
-            "created",
-            result.uid,
-            now
-          )
-          .run();
-
-        return out(
-          {
-            ok: true,
-
-            liveId,
-
-            inputId: result.uid,
-
-            title,
-
-            status: "created",
-
-            cloudflare: result,
-          },
-          201,
-          env
-        );
-      }
-
-      /*
-       * NOT FOUND
-       */
-
-      return out(
-        {
-          error: "not found",
-        },
-        404,
+      return await handleRequest(
+        request,
         env
       );
-
     } catch (error) {
-
-      console.error(
-        "Wave API error:",
-        error
-      );
-
-      return out(
+      return response(
         {
-          error:
-            "internal server error",
+          success: false,
+          message: "Internal Server Error",
+          error: String(error),
         },
         500,
+        request,
         env
       );
     }
