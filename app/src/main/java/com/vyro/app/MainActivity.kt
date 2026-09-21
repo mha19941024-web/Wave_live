@@ -20,37 +20,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CardGiftcard
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.VideoCall
-import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -82,7 +64,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            WaveTheme {
+            MaterialTheme {
                 WaveRoot()
             }
         }
@@ -90,15 +72,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun WaveTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        content = content
-    )
-}
-
-@Composable
 private fun WaveRoot() {
-    var showSplash by remember { mutableStateOf(true) }
+    var showSplash by remember {
+        mutableStateOf(true)
+    }
 
     LaunchedEffect(Unit) {
         delay(1800)
@@ -137,7 +114,10 @@ private fun SplashScreen() {
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            listOf(WavePurple, WavePink)
+                            listOf(
+                                WavePurple,
+                                WavePink
+                            )
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -150,7 +130,9 @@ private fun SplashScreen() {
                 )
             }
 
-            Spacer(modifier = Modifier.height(22.dp))
+            Spacer(
+                modifier = Modifier.height(22.dp)
+            )
 
             Text(
                 text = "WAVE",
@@ -165,7 +147,9 @@ private fun SplashScreen() {
                 fontSize = 16.sp
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(
+                modifier = Modifier.height(28.dp)
+            )
 
             Text(
                 text = "LIVE • MUSIC • FRIENDS",
@@ -185,11 +169,15 @@ private enum class WaveTab {
     PROFILE
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WaveApp() {
-    var selectedTab by remember { mutableStateOf(WaveTab.HOME) }
-    var coins by remember { mutableIntStateOf(1250) }
+    var selectedTab by remember {
+        mutableStateOf(WaveTab.HOME)
+    }
+
+    var coins by remember {
+        mutableIntStateOf(1250)
+    }
 
     Scaffold(
         containerColor = WaveDark,
@@ -204,29 +192,19 @@ private fun WaveApp() {
                             WaveTab.INBOX -> "Inbox"
                             WaveTab.PROFILE -> "Profile"
                         },
-                        fontWeight = FontWeight.ExtraBold,
-                        color = WaveText
+                        color = WaveText,
+                        fontWeight = FontWeight.ExtraBold
                     )
                 },
                 actions = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ShoppingCart,
-                            contentDescription = "Coins",
-                            tint = Color(0xFFFFD54F),
-                            modifier = Modifier.size(19.dp)
+                    Text(
+                        text = "🪙 $coins",
+                        color = Color(0xFFFFD54F),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(
+                            end = 14.dp
                         )
-
-                        Text(
-                            text = coins.toString(),
-                            color = WaveText,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        )
-                    }
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = WaveDark
@@ -240,47 +218,83 @@ private fun WaveApp() {
             ) {
                 NavigationBarItem(
                     selected = selectedTab == WaveTab.HOME,
-                    onClick = { selectedTab = WaveTab.HOME },
-                    icon = {
-                        Icon(Icons.Default.Home, "Home")
+                    onClick = {
+                        selectedTab = WaveTab.HOME
                     },
-                    label = { Text("Home") }
+                    icon = {
+                        Text(
+                            text = "⌂",
+                            fontSize = 22.sp
+                        )
+                    },
+                    label = {
+                        Text("Home")
+                    }
                 )
 
                 NavigationBarItem(
                     selected = selectedTab == WaveTab.LIVE,
-                    onClick = { selectedTab = WaveTab.LIVE },
-                    icon = {
-                        Icon(Icons.Default.LiveTv, "Live")
+                    onClick = {
+                        selectedTab = WaveTab.LIVE
                     },
-                    label = { Text("LIVE") }
+                    icon = {
+                        Text(
+                            text = "●",
+                            fontSize = 20.sp
+                        )
+                    },
+                    label = {
+                        Text("LIVE")
+                    }
                 )
 
                 NavigationBarItem(
                     selected = selectedTab == WaveTab.CREATE,
-                    onClick = { selectedTab = WaveTab.CREATE },
-                    icon = {
-                        Icon(Icons.Default.Add, "Create")
+                    onClick = {
+                        selectedTab = WaveTab.CREATE
                     },
-                    label = { Text("Create") }
+                    icon = {
+                        Text(
+                            text = "+",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    label = {
+                        Text("Create")
+                    }
                 )
 
                 NavigationBarItem(
                     selected = selectedTab == WaveTab.INBOX,
-                    onClick = { selectedTab = WaveTab.INBOX },
-                    icon = {
-                        Icon(Icons.Default.Mail, "Inbox")
+                    onClick = {
+                        selectedTab = WaveTab.INBOX
                     },
-                    label = { Text("Inbox") }
+                    icon = {
+                        Text(
+                            text = "✉",
+                            fontSize = 21.sp
+                        )
+                    },
+                    label = {
+                        Text("Inbox")
+                    }
                 )
 
                 NavigationBarItem(
                     selected = selectedTab == WaveTab.PROFILE,
-                    onClick = { selectedTab = WaveTab.PROFILE },
-                    icon = {
-                        Icon(Icons.Default.Person, "Profile")
+                    onClick = {
+                        selectedTab = WaveTab.PROFILE
                     },
-                    label = { Text("Profile") }
+                    icon = {
+                        Text(
+                            text = "●",
+                            fontSize = 21.sp
+                        )
+                    },
+                    label = {
+                        Text("Profile")
+                    }
                 )
             }
         }
@@ -292,31 +306,41 @@ private fun WaveApp() {
                 .padding(paddingValues)
         ) {
             when (selectedTab) {
-                WaveTab.HOME -> HomeScreen(
-                    onOpenLive = {
-                        selectedTab = WaveTab.LIVE
-                    }
-                )
-
-                WaveTab.LIVE -> LiveScreen(
-                    coins = coins,
-                    onGiftSent = { price ->
-                        if (coins >= price) {
-                            coins -= price
+                WaveTab.HOME -> {
+                    HomeScreen(
+                        onOpenLive = {
+                            selectedTab = WaveTab.LIVE
                         }
-                    }
-                )
+                    )
+                }
 
-                WaveTab.CREATE -> CreateLiveScreen()
+                WaveTab.LIVE -> {
+                    LiveScreen(
+                        coins = coins,
+                        onGiftSent = { price ->
+                            if (coins >= price) {
+                                coins -= price
+                            }
+                        }
+                    )
+                }
 
-                WaveTab.INBOX -> InboxScreen()
+                WaveTab.CREATE -> {
+                    CreateLiveScreen()
+                }
 
-                WaveTab.PROFILE -> ProfileScreen(
-                    coins = coins,
-                    onAddCoins = {
-                        coins += 500
-                    }
-                )
+                WaveTab.INBOX -> {
+                    InboxScreen()
+                }
+
+                WaveTab.PROFILE -> {
+                    ProfileScreen(
+                        coins = coins,
+                        onAddCoins = {
+                            coins += 500
+                        }
+                    )
+                }
             }
         }
     }
@@ -334,7 +358,9 @@ private fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
 
             Text(
                 text = "Welcome to Wave 👋",
@@ -351,7 +377,9 @@ private fun HomeScreen(
         }
 
         item {
-            LiveHeroCard(onOpenLive)
+            LiveHeroCard(
+                onClick = onOpenLive
+            )
         }
 
         item {
@@ -371,6 +399,7 @@ private fun HomeScreen(
                 "Nour Chat"
             )
         ) { name ->
+
             LiveRoomCard(
                 name = name,
                 onClick = onOpenLive
@@ -378,7 +407,9 @@ private fun HomeScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(
+                modifier = Modifier.height(20.dp)
+            )
         }
     }
 }
@@ -391,7 +422,9 @@ private fun LiveHeroCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(190.dp)
-            .clickable { onClick() },
+            .clickable {
+                onClick()
+            },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = WaveCard
@@ -413,14 +446,16 @@ private fun LiveHeroCard(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    imageVector = Icons.Default.VideoCall,
-                    contentDescription = "Live",
-                    tint = Color.White,
-                    modifier = Modifier.size(55.dp)
+                Text(
+                    text = "●",
+                    color = Color.White,
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Bold
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
 
                 Text(
                     text = "GO LIVE",
@@ -431,7 +466,9 @@ private fun LiveHeroCard(
 
                 Text(
                     text = "Join the Wave",
-                    color = Color.White.copy(alpha = 0.8f),
+                    color = Color.White.copy(
+                        alpha = 0.8f
+                    ),
                     fontSize = 14.sp
                 )
             }
@@ -448,7 +485,9 @@ private fun LiveRoomCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(82.dp)
-            .clickable { onClick() },
+            .clickable {
+                onClick()
+            },
         colors = CardDefaults.cardColors(
             containerColor = WaveCard
         ),
@@ -466,7 +505,10 @@ private fun LiveRoomCard(
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            listOf(WavePurple, WavePink)
+                            listOf(
+                                WavePurple,
+                                WavePink
+                            )
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -491,28 +533,18 @@ private fun LiveRoomCard(
                     fontSize = 16.sp
                 )
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF22C55E))
-                    )
-
-                    Text(
-                        text = " LIVE now",
-                        color = Color(0xFF22C55E),
-                        fontSize = 12.sp
-                    )
-                }
+                Text(
+                    text = "● LIVE now",
+                    color = Color(0xFF22C55E),
+                    fontSize = 12.sp
+                )
             }
 
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = "Open",
-                tint = WavePurple
+            Text(
+                text = "▶",
+                color = WavePurple,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
             )
         }
     }
@@ -523,7 +555,9 @@ private fun LiveScreen(
     coins: Int,
     onGiftSent: (Int) -> Unit
 ) {
-    var showGifts by remember { mutableStateOf(false) }
+    var showGifts by remember {
+        mutableStateOf(false)
+    }
 
     Box(
         modifier = Modifier
@@ -570,7 +604,9 @@ private fun LiveScreen(
                         }
 
                         Column(
-                            modifier = Modifier.padding(start = 10.dp)
+                            modifier = Modifier.padding(
+                                start = 10.dp
+                            )
                         ) {
                             Text(
                                 text = "Wave Creator",
@@ -586,69 +622,76 @@ private fun LiveScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(
+                        modifier = Modifier.weight(1f)
+                    )
 
                     Text(
                         text = "LIVE",
                         color = Color.White,
                         fontSize = 38.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                        modifier = Modifier.align(
+                            Alignment.CenterHorizontally
+                        )
                     )
 
                     Text(
                         text = "Live video preview",
                         color = WaveMuted,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                        modifier = Modifier.align(
+                            Alignment.CenterHorizontally
+                        )
                     )
 
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF100C16))
+                    .background(
+                        Color(0xFF100C16)
+                    )
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = { }
+                    onClick = {}
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Favorite,
-                        contentDescription = "Like",
-                        tint = Color(0xFFFF4D88)
+                    Text(
+                        text = "♥",
+                        color = Color(0xFFFF4D88),
+                        fontSize = 26.sp
                     )
                 }
 
                 IconButton(
-                    onClick = { }
+                    onClick = {}
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Send,
-                        contentDescription = "Send",
-                        tint = Color.White
+                    Text(
+                        text = "➤",
+                        color = Color.White,
+                        fontSize = 23.sp
                     )
                 }
 
-                Spacer(modifier = Modifier.weight(1f))
+                Spacer(
+                    modifier = Modifier.weight(1f)
+                )
 
                 Button(
-                    onClick = { showGifts = true },
+                    onClick = {
+                        showGifts = true
+                    },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = WavePurple
                     )
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CardGiftcard,
-                        contentDescription = "Gift"
-                    )
-
-                    Spacer(modifier = Modifier.size(6.dp))
-
-                    Text("Gifts")
+                    Text("🎁 Gifts")
                 }
             }
         }
@@ -656,7 +699,9 @@ private fun LiveScreen(
         if (showGifts) {
             GiftPanel(
                 coins = coins,
-                onClose = { showGifts = false },
+                onClose = {
+                    showGifts = false
+                },
                 onGift = {
                     onGiftSent(it)
                     showGifts = false
@@ -679,17 +724,41 @@ private fun GiftPanel(
     onGift: (Int) -> Unit
 ) {
     val gifts = listOf(
-        WaveGift("Rose", "🌹", 5),
-        WaveGift("Heart", "💖", 20),
-        WaveGift("Diamond", "💎", 100),
-        WaveGift("Crown", "👑", 500),
-        WaveGift("Wave Crown", "👑", 1000)
+        WaveGift(
+            name = "Rose",
+            emoji = "🌹",
+            price = 5
+        ),
+        WaveGift(
+            name = "Heart",
+            emoji = "💖",
+            price = 20
+        ),
+        WaveGift(
+            name = "Diamond",
+            emoji = "💎",
+            price = 100
+        ),
+        WaveGift(
+            name = "Crown",
+            emoji = "👑",
+            price = 500
+        ),
+        WaveGift(
+            name = "Wave Crown",
+            emoji = "👑",
+            price = 1000
+        )
     )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.65f)),
+            .background(
+                Color.Black.copy(
+                    alpha = 0.65f
+                )
+            ),
         contentAlignment = Alignment.BottomCenter
     ) {
         Card(
@@ -723,9 +792,12 @@ private fun GiftPanel(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(
+                    modifier = Modifier.height(14.dp)
+                )
 
                 gifts.forEach { gift ->
+
                     GiftRow(
                         gift = gift,
                         enabled = coins >= gift.price,
@@ -734,7 +806,9 @@ private fun GiftPanel(
                         }
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
                 }
 
                 OutlinedButton(
@@ -757,7 +831,9 @@ private fun GiftRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled) {
+            .clickable(
+                enabled = enabled
+            ) {
                 onClick()
             },
         colors = CardDefaults.cardColors(
@@ -777,7 +853,10 @@ private fun GiftRow(
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            listOf(WavePurple, WavePink)
+                            listOf(
+                                WavePurple,
+                                WavePink
+                            )
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -821,7 +900,9 @@ private fun GiftRow(
 
 @Composable
 private fun CreateLiveScreen() {
-    var started by remember { mutableStateOf(false) }
+    var started by remember {
+        mutableStateOf(false)
+    }
 
     Column(
         modifier = Modifier
@@ -830,7 +911,9 @@ private fun CreateLiveScreen() {
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(
+            modifier = Modifier.height(20.dp)
+        )
 
         Box(
             modifier = Modifier
@@ -838,40 +921,53 @@ private fun CreateLiveScreen() {
                 .clip(CircleShape)
                 .background(
                     Brush.linearGradient(
-                        listOf(WavePurple, WavePink)
+                        listOf(
+                            WavePurple,
+                            WavePink
+                        )
                     )
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.VideoCall,
-                contentDescription = "Create live",
-                tint = Color.White,
-                modifier = Modifier.size(45.dp)
+            Text(
+                text = "●",
+                color = Color.White,
+                fontSize = 42.sp
             )
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(
+            modifier = Modifier.height(20.dp)
+        )
 
         Text(
-            text = if (started) "Live Ready" else "Start your Live",
+            text = if (started) {
+                "Live Ready"
+            } else {
+                "Start your Live"
+            },
             color = Color.White,
             fontSize = 28.sp,
             fontWeight = FontWeight.ExtraBold
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(
+            modifier = Modifier.height(10.dp)
+        )
 
         Text(
-            text = if (started)
+            text = if (started) {
                 "Your live session is ready."
-            else
-                "Create a live room and connect with your audience.",
+            } else {
+                "Create a live room and connect with your audience."
+            },
             color = WaveMuted,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(30.dp))
+        Spacer(
+            modifier = Modifier.height(30.dp)
+        )
 
         Button(
             onClick = {
@@ -883,13 +979,19 @@ private fun CreateLiveScreen() {
             )
         ) {
             Text(
-                text = if (started) "Stop Preview" else "Start Live",
+                text = if (started) {
+                    "Stop Preview"
+                } else {
+                    "Start Live"
+                },
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(
+            modifier = Modifier.height(14.dp)
+        )
 
         if (started) {
             Card(
@@ -907,7 +1009,9 @@ private fun CreateLiveScreen() {
                         fontWeight = FontWeight.Bold
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(
+                        modifier = Modifier.height(10.dp)
+                    )
 
                     Text(
                         text = "RTMPS URL",
@@ -936,14 +1040,15 @@ private fun InboxScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = Icons.Default.Mail,
-            contentDescription = "Inbox",
-            tint = WavePurple,
-            modifier = Modifier.size(70.dp)
+        Text(
+            text = "✉",
+            color = WavePurple,
+            fontSize = 70.sp
         )
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(
+            modifier = Modifier.height(18.dp)
+        )
 
         Text(
             text = "INBOX",
@@ -952,7 +1057,9 @@ private fun InboxScreen() {
             fontWeight = FontWeight.ExtraBold
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(
+            modifier = Modifier.height(8.dp)
+        )
 
         Text(
             text = "Notifications and messages will appear here.",
@@ -982,21 +1089,26 @@ private fun ProfileScreen(
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            listOf(WavePurple, WavePink)
+                            listOf(
+                                WavePurple,
+                                WavePink
+                            )
                         )
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.AccountCircle,
-                    contentDescription = "Profile",
-                    tint = Color.White,
-                    modifier = Modifier.size(70.dp)
+                Text(
+                    text = "W",
+                    color = Color.White,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.ExtraBold
                 )
             }
 
             Column(
-                modifier = Modifier.padding(start = 15.dp)
+                modifier = Modifier.padding(
+                    start = 15.dp
+                )
             ) {
                 Text(
                     text = "Wave User",
@@ -1012,7 +1124,9 @@ private fun ProfileScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(25.dp))
+        Spacer(
+            modifier = Modifier.height(25.dp)
+        )
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -1027,11 +1141,9 @@ private fun ProfileScreen(
                     .padding(18.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Wallet,
-                    contentDescription = "Wallet",
-                    tint = Color(0xFFFFD54F),
-                    modifier = Modifier.size(34.dp)
+                Text(
+                    text = "🪙",
+                    fontSize = 32.sp
                 )
 
                 Column(
@@ -1063,20 +1175,22 @@ private fun ProfileScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(
+            modifier = Modifier.height(16.dp)
+        )
 
         ProfileOption(
-            icon = Icons.Default.Wallet,
+            iconText = "🪙",
             title = "Wallet & Coins"
         )
 
         ProfileOption(
-            icon = Icons.Default.CardGiftcard,
+            iconText = "🎁",
             title = "My Gifts"
         )
 
         ProfileOption(
-            icon = Icons.Default.Settings,
+            iconText = "⚙",
             title = "Settings"
         )
     }
@@ -1084,7 +1198,7 @@ private fun ProfileScreen(
 
 @Composable
 private fun ProfileOption(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconText: String,
     title: String
 ) {
     Card(
@@ -1102,11 +1216,9 @@ private fun ProfileOption(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = WavePurple,
-                modifier = Modifier.size(25.dp)
+            Text(
+                text = iconText,
+                fontSize = 25.sp
             )
 
             Text(
@@ -1114,7 +1226,9 @@ private fun ProfileOption(
                 color = Color.White,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 14.dp)
+                modifier = Modifier.padding(
+                    start = 14.dp
+                )
             )
         }
     }
