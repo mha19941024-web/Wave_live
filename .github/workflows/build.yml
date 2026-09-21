@@ -60,6 +60,7 @@ jobs:
           done
 
           echo ""
+
           if [ "$missing" -ne 0 ]; then
             echo "===== ONE OR MORE REQUIRED FILES ARE MISSING ====="
             exit 1
@@ -71,13 +72,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           chmod +x ./gradlew
+
+          echo "===== GRADLE VERSION ====="
           ./gradlew --version
 
       - name: Build Debug APK
         shell: bash
         run: |
           set -euo pipefail
+
           ./gradlew :app:assembleDebug --stacktrace
 
       - name: Verify APK
@@ -92,5 +97,13 @@ jobs:
             exit 1
           fi
 
-          echo "APK CREATED SUCCESSFULLY"
+          echo "===== APK CREATED SUCCESSFULLY ====="
           ls -lh "$APK"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Wave-Live-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
