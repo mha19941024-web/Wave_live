@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS live_sessions (
 CREATE INDEX IF NOT EXISTS idx_live_sessions_status
 ON live_sessions(status, created_at DESC);
 
+
 CREATE TABLE IF NOT EXISTS gift_catalog (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -20,11 +21,13 @@ CREATE TABLE IF NOT EXISTS gift_catalog (
   active INTEGER NOT NULL DEFAULT 1
 );
 
+
 CREATE TABLE IF NOT EXISTS wallets (
   user_id TEXT PRIMARY KEY,
   coins INTEGER NOT NULL DEFAULT 0 CHECK(coins >= 0),
   updated_at TEXT NOT NULL
 );
+
 
 CREATE TABLE IF NOT EXISTS gift_transactions (
   id TEXT PRIMARY KEY,
@@ -40,13 +43,14 @@ CREATE TABLE IF NOT EXISTS gift_transactions (
 CREATE INDEX IF NOT EXISTS idx_gift_transactions_live
 ON gift_transactions(live_id, created_at DESC);
 
+
 INSERT OR IGNORE INTO gift_catalog
-(id,name,icon,price_coins,sort_order,active)
+(id, name, icon, price_coins, sort_order, active)
 VALUES
-('rose','Rose','🌹',5,10,1),
-('heart','Heart','💖',10,20,1),
-('crown','Wave Crown','👑',500,30,1),
-('lion','Lion','🦁',1000,40,1),
-('diamond','Wave Diamond','💎',250,50,1),
-('rocket','Wave Rocket','🚀',500,60,1),
-('star','Super Star','🌟',1000,70,1);
+('rose', 'Rose', '🌹', 5, 10, 1),
+('heart', 'Heart', '💖', 10, 20, 1),
+('crown', 'Wave Crown', '👑', 500, 30, 1),
+('diamond', 'Wave Diamond', '💎', 250, 40, 1),
+('rocket', 'Wave Rocket', '🚀', 500, 50, 1),
+('lion', 'Lion', '🦁', 1000, 60, 1),
+('star', 'Super Star', '🌟', 1000, 70, 1);
