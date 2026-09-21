@@ -16,9 +16,7 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        vectorDrawables {
-            useSupportLibrary = true
-        }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -26,17 +24,9 @@ android {
         buildConfig = true
     }
 
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-
-        debug {
-            isMinifyEnabled = false
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 
@@ -48,12 +38,6 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-    }
 }
 
 dependencies {
@@ -61,18 +45,18 @@ dependencies {
 
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
 
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-
-    implementation("androidx.navigation:navigation-compose:2.8.6")
+    implementation("androidx.navigation:navigation-compose:2.8.7")
 
     implementation("androidx.media3:media3-exoplayer:1.6.1")
     implementation("androidx.media3:media3-ui:1.6.1")
+    implementation("androidx.media3:media3-common:1.6.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
