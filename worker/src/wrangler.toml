@@ -6,7 +6,8 @@ compatibility_date = "2026-09-01"
 ENVIRONMENT = "production"
 SESSION_DAYS = "30"
 
-# ضع هنا نطاق التطبيق المسموح له بالاتصال بالـ API عند تجهيز الإنتاج.
+# CORS:
+# عند تجهيز نطاق التطبيق الحقيقي يمكن إضافة:
 # CORS_ORIGIN = "https://your-app-domain.example"
 
 [[d1_databases]]
