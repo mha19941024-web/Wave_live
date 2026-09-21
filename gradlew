@@ -1,11 +1,25 @@
 #!/bin/sh
-set -e
+
 APP_HOME=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-if [ -x "$APP_HOME/gradle-8.9/bin/gradle" ]; then
-  exec "$APP_HOME/gradle-8.9/bin/gradle" "$@"
+
+if [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+    JAVACMD="$JAVA_HOME/bin/java"
+elif command -v java >/dev/null 2>&1; then
+    JAVACMD="java"
+else
+    echo "ERROR: JAVA_HOME is not set and no 'java' command could be found." >&2
+    exit 1
 fi
-if command -v gradle >/dev/null 2>&1; then
-  exec gradle "$@"
+
+CLASSPATH="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+
+if [ ! -f "$CLASSPATH" ]; then
+    echo "ERROR: gradle-wrapper.jar is missing." >&2
+    echo "The file must exist at gradle/wrapper/gradle-wrapper.jar" >&2
+    exit 1
 fi
-echo "Gradle is not installed. Use GitHub Actions workflow or install Gradle 8.9." >&2
-exit 1
+
+exec "$JAVACMD" \
+    -classpath "$CLASSPATH" \
+    org.gradle.wrapper.GradleWrapperMain \
+    "$@"
