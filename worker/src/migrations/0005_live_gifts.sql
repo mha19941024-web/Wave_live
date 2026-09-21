@@ -7,7 +7,9 @@ CREATE TABLE IF NOT EXISTS live_sessions (
   created_at TEXT NOT NULL,
   ended_at TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_live_sessions_status ON live_sessions(status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_live_sessions_status
+ON live_sessions(status, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS gift_catalog (
   id TEXT PRIMARY KEY,
@@ -34,10 +36,17 @@ CREATE TABLE IF NOT EXISTS gift_transactions (
   coins_total INTEGER NOT NULL CHECK(coins_total > 0),
   created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_gift_transactions_live ON gift_transactions(live_id, created_at DESC);
 
-INSERT OR IGNORE INTO gift_catalog(id,name,icon,price_coins,sort_order,active) VALUES
+CREATE INDEX IF NOT EXISTS idx_gift_transactions_live
+ON gift_transactions(live_id, created_at DESC);
+
+INSERT OR IGNORE INTO gift_catalog
+(id,name,icon,price_coins,sort_order,active)
+VALUES
 ('rose','Rose','🌹',5,10,1),
 ('heart','Heart','💖',10,20,1),
 ('crown','Wave Crown','👑',500,30,1),
-('lion','Lion','🦁',1000,40,1);
+('lion','Lion','🦁',1000,40,1),
+('diamond','Wave Diamond','💎',250,50,1),
+('rocket','Wave Rocket','🚀',500,60,1),
+('star','Super Star','🌟',1000,70,1);
