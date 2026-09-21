@@ -1,13 +1,16 @@
-# Wave Live
-# Release build: keep Compose and application classes safe.
+# Wave Live - ProGuard / R8 rules
+# Keep Kotlin metadata
+-keep class kotlin.Metadata { *; }
 
+# Keep Compose classes
+-keep class androidx.compose.** { *; }
+
+# Keep Media3 / ExoPlayer
+-keep class androidx.media3.** { *; }
+
+# Keep application models and API data
 -keep class com.vyro.app.** { *; }
 
--keep class kotlinx.serialization.** { *; }
--dontwarn kotlinx.serialization.**
-
--dontwarn okhttp3.**
--dontwarn okio.**
-
+# Keep Retrofit/JSON-style model fields if added later
 -keepattributes *Annotation*
 -keepattributes Signature
