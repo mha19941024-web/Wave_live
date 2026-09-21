@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <resources>
-    <color name="transparent">#00000000</color>
+
+    <color name="wave_background">#08060D</color>
+    <color name="wave_card">#15111D</color>
+    <color name="wave_purple">#9B5CFF</color>
+    <color name="wave_pink">#FF4FA3</color>
+    <color name="wave_cyan">#35D9FF</color>
+    <color name="wave_gold">#FFC857</color>
+    <color name="wave_white">#FFFFFF</color>
+
 </resources>
