@@ -1,8 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.WaveLive" parent="android:style/Theme.Material.Light.NoActionBar">
+
+    <style name="Theme.WaveLive" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:colorAccent">#9B5CFF</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:statusBarColor">#08060D</item>
         <item name="android:navigationBarColor">#08060D</item>
+        <item name="android:windowBackground">#08060D</item>
     </style>
+
 </resources>
