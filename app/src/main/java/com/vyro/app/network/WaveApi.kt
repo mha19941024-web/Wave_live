@@ -9,172 +9,163 @@ import java.net.URL
 
 object WaveApi {
 
-private const val BASE_URL =
-    "https://worker-jolly-band-100e.mha19941024.workers.dev"
+    private const val BASE_URL =
+        "https://worker-jolly-band-100e.mha19941024.workers.dev"
 
-private var sessionToken: String? = null
+    private var sessionToken: String? = null
 
-fun setSessionToken(token: String?) {
-    sessionToken = token?.trim()?.takeIf { it.isNotEmpty() }
-}
-
-fun getSessionToken(): String? {
-    return sessionToken
-}
-
-private suspend fun request(
-    endpoint: String,
-    method: String = "GET",
-    body: String? = null,
-    authenticated: Boolean = false
-): String = withContext(Dispatchers.IO) {
-
-    val url = URL(BASE_URL + endpoint)
-
-    val connection =
-        url.openConnection() as HttpURLConnection
-
-    try {
-        connection.requestMethod = method
-        connection.connectTimeout = 15000
-        connection.readTimeout = 20000
-
-        connection.setRequestProperty(
-            "Accept",
-            "application/json"
-        )
-
-        connection.setRequestProperty(
-            "Content-Type",
-            "application/json"
-        )
-
-        if (authenticated) {
-            val token = sessionToken
-
-            if (!token.isNullOrBlank()) {
-                connection.setRequestProperty(
-                    "Authorization",
-                    "Bearer $token"
-                )
-            }
-        }
-
-        if (body != null) {
-            connection.doOutput = true
-
-            connection.outputStream.use { output ->
-                output.write(
-                    body.toByteArray(Charsets.UTF_8)
-                )
-            }
-        }
-
-        val responseCode =
-            connection.responseCode
-
-        val stream =
-            if (responseCode in 200..299) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            }
-
-        val response =
-            stream
-                ?.bufferedReader()
-                ?.use { it.readText() }
-                ?: ""
-
-        if (responseCode !in 200..299) {
-            throw Exception(
-                "Server error $responseCode: $response"
-            )
-        }
-
-        response
-
-    } finally {
-        connection.disconnect()
+    fun setSessionToken(token: String?) {
+        sessionToken = token
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
     }
-}
 
-suspend fun serverStatus(): String {
-    return request(
-        endpoint = "/health"
-    )
-}
+    fun getSessionToken(): String? {
+        return sessionToken
+    }
 
-suspend fun createSession(): JSONObject {
+    private suspend fun request(
+        endpoint: String,
+        method: String = "GET",
+        body: String? = null,
+        authenticated: Boolean = false
+    ): String = withContext(Dispatchers.IO) {
 
-    val response =
-        request(
+        val connection =
+            URL(BASE_URL + endpoint)
+                .openConnection() as HttpURLConnection
+
+        try {
+            connection.requestMethod = method
+            connection.connectTimeout = 15000
+            connection.readTimeout = 20000
+
+            connection.setRequestProperty(
+                "Accept",
+                "application/json"
+            )
+
+            connection.setRequestProperty(
+                "Content-Type",
+                "application/json"
+            )
+
+            if (authenticated) {
+                sessionToken?.let { token ->
+                    connection.setRequestProperty(
+                        "Authorization",
+                        "Bearer $token"
+                    )
+                }
+            }
+
+            if (body != null) {
+                connection.doOutput = true
+
+                connection.outputStream.use { output ->
+                    output.write(
+                        body.toByteArray(Charsets.UTF_8)
+                    )
+                }
+            }
+
+            val responseCode =
+                connection.responseCode
+
+            val stream =
+                if (responseCode in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
+
+            val response =
+                stream
+                    ?.bufferedReader()
+                    ?.use { it.readText() }
+                    ?: ""
+
+            if (responseCode !in 200..299) {
+                throw Exception(
+                    "Server error $responseCode: $response"
+                )
+            }
+
+            response
+
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    suspend fun serverStatus(): String {
+        return request("/health")
+    }
+
+    suspend fun createSession(): JSONObject {
+
+        val response = request(
             endpoint = "/api/session",
             method = "POST"
         )
 
-    val json =
-        JSONObject(response)
+        val json = JSONObject(response)
 
-    val token =
-        json.optString("token")
+        val token =
+            json.optString("token")
 
-    if (token.isNotBlank()) {
-        setSessionToken(token)
+        if (token.isNotBlank()) {
+            setSessionToken(token)
+        }
+
+        return json
     }
 
-    return json
-}
-
-suspend fun getMe(): JSONObject {
-    return JSONObject(
-        request(
-            endpoint = "/api/me",
-            authenticated = true
+    suspend fun getMe(): JSONObject {
+        return JSONObject(
+            request(
+                endpoint = "/api/me",
+                authenticated = true
+            )
         )
-    )
-}
+    }
 
-suspend fun getFeed(
-    limit: Int = 20,
-    cursor: Int = 0
-): JSONObject {
+    suspend fun getFeed(
+        limit: Int = 20,
+        cursor: Int = 0
+    ): JSONObject {
 
-    return JSONObject(
-        request(
-            endpoint =
-                "/api/feed?limit=$limit&cursor=$cursor",
-            authenticated = true
+        return JSONObject(
+            request(
+                endpoint =
+                    "/api/feed?limit=$limit&cursor=$cursor",
+                authenticated = true
+            )
         )
-    )
-}
+    }
 
-suspend fun getVideos(): JSONArray {
+    suspend fun getVideos(): JSONArray {
+        return getFeed()
+            .optJSONArray("items")
+            ?: JSONArray()
+    }
 
-    val json =
-        getFeed()
+    suspend fun createVideo(
+        url: String,
+        caption: String = "",
+        streamId: String? = null
+    ): JSONObject {
 
-    return json.optJSONArray("items")
-        ?: JSONArray()
-}
-
-suspend fun createVideo(
-    url: String,
-    caption: String = "",
-    streamId: String? = null
-): JSONObject {
-
-    val body =
-        JSONObject().apply {
+        val body = JSONObject().apply {
 
             if (url.isNotBlank()) {
-                put("url", url)
+                put("url", url.trim())
             }
 
             if (!streamId.isNullOrBlank()) {
                 put(
                     "streamId",
-                    streamId
+                    streamId.trim()
                 )
             }
 
@@ -184,224 +175,249 @@ suspend fun createVideo(
             )
         }
 
-    return JSONObject(
-        request(
-            endpoint = "/api/videos",
-            method = "POST",
-            body = body.toString(),
-            authenticated = true
+        return JSONObject(
+            request(
+                endpoint = "/api/videos",
+                method = "POST",
+                body = body.toString(),
+                authenticated = true
+            )
         )
-    )
-}
+    }
 
-suspend fun likeVideo(
-    videoId: String
-): JSONObject {
+    suspend fun likeVideo(
+        videoId: String
+    ): JSONObject {
 
-    return JSONObject(
-        request(
-            endpoint =
-                "/api/videos/$videoId/like",
-            method = "POST",
-            authenticated = true
+        return JSONObject(
+            request(
+                endpoint =
+                    "/api/videos/$videoId/like",
+                method = "POST",
+                authenticated = true
+            )
         )
-    )
-}
+    }
 
-suspend fun unlikeVideo(
-    videoId: String
-): JSONObject {
+    suspend fun unlikeVideo(
+        videoId: String
+    ): JSONObject {
 
-    return JSONObject(
-        request(
-            endpoint =
-                "/api/videos/$videoId/like",
-            method = "DELETE",
-            authenticated = true
+        return JSONObject(
+            request(
+                endpoint =
+                    "/api/videos/$videoId/like",
+                method = "DELETE",
+                authenticated = true
+            )
         )
-    )
-}
+    }
 
-suspend fun getComments(
-    videoId: String,
-    limit: Int = 30
-): JSONArray {
+    suspend fun getComments(
+        videoId: String,
+        limit: Int = 30
+    ): JSONArray {
 
-    val json =
-        JSONObject(
+        return JSONObject(
             request(
                 endpoint =
                     "/api/videos/$videoId/comments?limit=$limit",
                 authenticated = true
             )
-        )
+        ).optJSONArray("items")
+            ?: JSONArray()
+    }
 
-    return json.optJSONArray("items")
-        ?: JSONArray()
-}
+    suspend fun addComment(
+        videoId: String,
+        text: String
+    ): JSONObject {
 
-suspend fun addComment(
-    videoId: String,
-    text: String
-): JSONObject {
-
-    val body =
-        JSONObject().apply {
+        val body = JSONObject().apply {
             put(
                 "text",
                 text.trim()
             )
         }
 
-    return JSONObject(
-        request(
-            endpoint =
-                "/api/videos/$videoId/comments",
-            method = "POST",
-            body = body.toString(),
-            authenticated = true
-        )
-    )
-}
-
-suspend fun followUser(
-    userIdOrUsername: String
-): JSONObject {
-
-    return JSONObject(
-        request(
-            endpoint =
-                "/api/users/$userIdOrUsername/follow",
-            method = "POST",
-            authenticated = true
-        )
-    )
-}
-
-suspend fun unfollowUser(
-    userIdOrUsername: String
-): JSONObject {
-
-    return JSONObject(
-        request(
-            endpoint =
-                "/api/users/$userIdOrUsername/follow",
-            method = "DELETE",
-            authenticated = true
-        )
-    )
-}
-
-suspend fun updateProfile(
-    displayName: String? = null,
-    bio: String? = null,
-    avatarUrl: String? = null
-): JSONObject {
-
-    val body =
-        JSONObject()
-
-    if (displayName != null) {
-        body.put(
-            "displayName",
-            displayName
-        )
-    }
-
-    if (bio != null) {
-        body.put(
-            "bio",
-            bio
-        )
-    }
-
-    if (avatarUrl != null) {
-        body.put(
-            "avatarUrl",
-            avatarUrl
-        )
-    }
-
-    return JSONObject(
-        request(
-            endpoint = "/api/profile",
-            method = "PATCH",
-            body = body.toString(),
-            authenticated = true
-        )
-    )
-}
-
-suspend fun getLives(): JSONArray {
-
-    val json =
-        JSONObject(
+        return JSONObject(
             request(
-                endpoint = "/api/lives",
+                endpoint =
+                    "/api/videos/$videoId/comments",
+                method = "POST",
+                body = body.toString(),
                 authenticated = true
             )
         )
+    }
 
-    return json.optJSONArray("items")
-        ?: json.optJSONArray("lives")
-        ?: JSONArray()
-}
+    suspend fun followUser(
+        userIdOrUsername: String
+    ): JSONObject {
 
-suspend fun createLive(
-    title: String
-): JSONObject {
+        return JSONObject(
+            request(
+                endpoint =
+                    "/api/users/$userIdOrUsername/follow",
+                method = "POST",
+                authenticated = true
+            )
+        )
+    }
 
-    val body =
-        JSONObject().apply {
+    suspend fun unfollowUser(
+        userIdOrUsername: String
+    ): JSONObject {
+
+        return JSONObject(
+            request(
+                endpoint =
+                    "/api/users/$userIdOrUsername/follow",
+                method = "DELETE",
+                authenticated = true
+            )
+        )
+    }
+
+    suspend fun updateProfile(
+        displayName: String? = null,
+        bio: String? = null,
+        avatarUrl: String? = null
+    ): JSONObject {
+
+        val body = JSONObject()
+
+        displayName?.let {
+            body.put(
+                "displayName",
+                it.trim()
+            )
+        }
+
+        bio?.let {
+            body.put(
+                "bio",
+                it.trim()
+            )
+        }
+
+        avatarUrl?.let {
+            body.put(
+                "avatarUrl",
+                it.trim()
+            )
+        }
+
+        return JSONObject(
+            request(
+                endpoint = "/api/profile",
+                method = "PATCH",
+                body = body.toString(),
+                authenticated = true
+            )
+        )
+    }
+
+    suspend fun getGifts(): JSONArray {
+
+        return JSONObject(
+            request(
+                endpoint = "/api/gifts"
+            )
+        ).optJSONArray("items")
+            ?: JSONArray()
+    }
+
+    /*
+     * إنشاء بث مباشر حقيقي
+     */
+    suspend fun createLive(
+        title: String
+    ): JSONObject {
+
+        val body = JSONObject().apply {
             put(
                 "title",
                 title.trim()
             )
         }
 
-    return JSONObject(
-        request(
-            endpoint = "/api/lives",
-            method = "POST",
-            body = body.toString(),
-            authenticated = true
-        )
-    )
-}
-
-suspend fun getGifts(): JSONArray {
-
-    val json =
-        JSONObject(
+        return JSONObject(
             request(
-                endpoint = "/api/gifts",
+                endpoint = "/api/live/create",
+                method = "POST",
+                body = body.toString(),
                 authenticated = true
             )
         )
+    }
 
-    return json.optJSONArray("items")
-        ?: json.optJSONArray("gifts")
-        ?: JSONArray()
-}
+    /*
+     * جلب بيانات بث مباشر
+     */
+    suspend fun getLive(
+        liveId: String
+    ): JSONObject {
 
-suspend fun sendGift(
-    liveId: String,
-    receiverId: String,
-    giftId: String,
-    quantity: Int = 1
-): JSONObject {
-
-    val body =
-        JSONObject().apply {
-            put(
-                "liveId",
-                liveId
+        return JSONObject(
+            request(
+                endpoint = "/api/live/$liveId",
+                authenticated = true
             )
+        )
+    }
 
-            put(
-                "receiverId",
-                receiverId
+    /*
+     * تغيير حالة البث
+     *
+     * status:
+     * created
+     * live
+     * ended
+     */
+    suspend fun updateLive(
+        liveId: String,
+        status: String? = null,
+        title: String? = null
+    ): JSONObject {
+
+        val body = JSONObject()
+
+        status?.let {
+            body.put(
+                "status",
+                it
             )
+        }
+
+        title?.let {
+            body.put(
+                "title",
+                it.trim()
+            )
+        }
+
+        return JSONObject(
+            request(
+                endpoint = "/api/live/$liveId",
+                method = "PATCH",
+                body = body.toString(),
+                authenticated = true
+            )
+        )
+    }
+
+    /*
+     * إرسال هدية داخل البث
+     */
+    suspend fun sendLiveGift(
+        liveId: String,
+        giftId: String,
+        quantity: Int = 1,
+        receiverUserId: String? = null
+    ): JSONObject {
+
+        val body = JSONObject().apply {
 
             put(
                 "giftId",
@@ -412,53 +428,66 @@ suspend fun sendGift(
                 "quantity",
                 quantity.coerceAtLeast(1)
             )
+
+            receiverUserId?.let {
+                put(
+                    "receiverUserId",
+                    it
+                )
+            }
         }
 
-    return JSONObject(
-        request(
-            endpoint = "/api/gifts/send",
-            method = "POST",
-            body = body.toString(),
-            authenticated = true
-        )
-    )
-}
-
-suspend fun getWallet(): JSONObject {
-    return getMe().optJSONObject("wallet")
-        ?: JSONObject().put(
-            "coins",
-            0
-        )
-}
-
-/*
- * لا يتم إضافة العملات من التطبيق مباشرة.
- *
- * الشحن الحقيقي يجب أن يمر من خلال
- * عملية دفع/تحقق في الخادم حتى لا يستطيع
- * المستخدم تعديل رصيده بنفسه.
- */
-suspend fun requestCoinRecharge(
-    amount: Int
-): JSONObject {
-
-    val body =
-        JSONObject().apply {
-            put(
-                "amount",
-                amount.coerceAtLeast(1)
+        return JSONObject(
+            request(
+                endpoint =
+                    "/api/live/$liveId/gifts",
+                method = "POST",
+                body = body.toString(),
+                authenticated = true
             )
-        }
-
-    return JSONObject(
-        request(
-            endpoint = "/api/wallet/recharge",
-            method = "POST",
-            body = body.toString(),
-            authenticated = true
         )
-    )
-}
+    }
 
+    /*
+     * رفع فيديو مباشر إلى Cloudflare Stream
+     */
+    suspend fun createDirectUpload(): JSONObject {
+
+        return JSONObject(
+            request(
+                endpoint =
+                    "/api/upload/direct",
+                method = "POST",
+                authenticated = true
+            )
+        )
+    }
+
+    /*
+     * بيانات المحفظة الحالية
+     */
+    suspend fun getWallet(): JSONObject {
+
+        return getMe()
+            .optJSONObject("wallet")
+            ?: JSONObject().apply {
+                put("coins", 0)
+            }
+    }
+
+    /*
+     * رصيد العملات فقط
+     */
+    suspend fun getCoins(): Int {
+        return getWallet()
+            .optInt("coins", 0)
+    }
+
+    /*
+     * ملاحظة:
+     * لا نضيف العملات محليًا.
+     *
+     * الشحن الحقيقي يجب أن يتم بعد
+     * تأكيد عملية الدفع على الخادم.
+     */
 }
