@@ -5,7 +5,8 @@ compatibility_date = "2026-09-01"
 [vars]
 ENVIRONMENT = "production"
 SESSION_DAYS = "30"
-# Set these in the dashboard/secret store for production.
+
+# Production CORS:
 # CORS_ORIGIN = "https://your-app-domain.example"
 
 [[d1_databases]]
