@@ -1,4 +1,4 @@
-name: Build Wave Live APK
+name: Build Wave
 
 on:
   workflow_dispatch:
@@ -17,41 +17,80 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
-      - name: Set up Java 17
+      - name: Show project files
+        shell: bash
         run: |
-          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
-          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+          set -u
 
-      - name: Verify Java
-        run: |
-          java -version
-          javac -version
-
-      - name: Verify project files
-        run: |
-          pwd
           echo "===== ROOT ====="
+          pwd
           ls -la
 
+          echo ""
+          echo "===== GRADLE ====="
+          find gradle -maxdepth 3 -type f -print 2>/dev/null || true
+
+          echo ""
+          echo "===== APP ====="
+          find app -maxdepth 5 -type f -print 2>/dev/null | head -200 || true
+
+          echo ""
           echo "===== REQUIRED FILES ====="
-          test -f ./gradlew
-          test -f ./gradle/wrapper/gradle-wrapper.properties
-          test -f ./gradle/wrapper/gradle-wrapper.jar
 
-          echo "All required Gradle files are present."
+          required_files=(
+            "settings.gradle.kts"
+            "build.gradle.kts"
+            "gradle.properties"
+            "gradlew"
+            "gradle/wrapper/gradle-wrapper.properties"
+            "gradle/wrapper/gradle-wrapper.jar"
+            "app/build.gradle.kts"
+            "app/src/main/AndroidManifest.xml"
+          )
 
-      - name: Make Gradle executable
-        run: chmod +x ./gradlew
+          missing=0
 
-      - name: Check Gradle
-        run: ./gradlew --version
+          for file in "${required_files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "OK      $file"
+            else
+              echo "MISSING $file"
+              missing=1
+            fi
+          done
+
+          echo ""
+          if [ "$missing" -ne 0 ]; then
+            echo "===== ONE OR MORE REQUIRED FILES ARE MISSING ====="
+            exit 1
+          fi
+
+          echo "===== ALL REQUIRED FILES EXIST ====="
+
+      - name: Check Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew --version
 
       - name: Build Debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :app:assembleDebug --stacktrace
 
       - name: Verify APK
+        shell: bash
         run: |
-          echo "===== APK OUTPUT ====="
-          ls -lh app/build/outputs/apk/debug/
-          test -f app/build/outputs/apk/debug/app-debug.apk
-          echo "APK BUILD SUCCESSFUL"
+          set -euo pipefail
+
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+
+          if [ ! -f "$APK" ]; then
+            echo "APK NOT FOUND: $APK"
+            exit 1
+          fi
+
+          echo "APK CREATED SUCCESSFULLY"
+          ls -lh "$APK"
