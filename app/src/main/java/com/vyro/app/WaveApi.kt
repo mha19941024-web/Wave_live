@@ -9,16 +9,8 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
-/**
- * Wave Live API client
- *
- * Worker:
- * https://worker-jolly-band-100e.mha19941024.workers.dev/
- *
- * لا يحتاج هذا الملف إلى Retrofit أو OkHttp.
- * يستخدم HttpURLConnection الموجودة داخل Android.
- */
 object WaveApi {
 
     private const val BASE_URL =
@@ -59,6 +51,22 @@ object WaveApi {
         val icon: String,
         val imageUrl: String?,
         val animationUrl: String?
+    )
+
+    data class MusicTrack(
+        val id: String,
+        val title: String,
+        val artist: String,
+        val audioUrl: String,
+        val coverUrl: String?,
+        val durationSeconds: Int
+    )
+
+    data class VisualEffect(
+        val id: String,
+        val name: String,
+        val type: String,
+        val value: String
     )
 
     data class Live(
@@ -122,9 +130,6 @@ object WaveApi {
         val totalCoins: Int
     )
 
-    /**
-     * حفظ التوكن.
-     */
     private fun saveToken(
         context: Context,
         token: String
@@ -139,9 +144,6 @@ object WaveApi {
             .apply()
     }
 
-    /**
-     * قراءة التوكن.
-     */
     fun getToken(
         context: Context
     ): String? {
@@ -156,9 +158,6 @@ object WaveApi {
             )
     }
 
-    /**
-     * حذف الجلسة.
-     */
     fun clearSession(
         context: Context
     ) {
@@ -172,9 +171,6 @@ object WaveApi {
             .apply()
     }
 
-    /**
-     * تنفيذ HTTP request.
-     */
     private suspend fun request(
         context: Context,
         method: String,
@@ -281,10 +277,12 @@ object WaveApi {
 
             val success =
                 statusCode in 200..299 &&
-                    (json?.optBoolean(
-                        "success",
-                        true
-                    ) ?: true)
+                    (
+                        json?.optBoolean(
+                            "success",
+                            true
+                        ) ?: true
+                    )
 
             val error =
                 if (!success) {
@@ -323,11 +321,6 @@ object WaveApi {
         }
     }
 
-    /**
-     * فحص السيرفر.
-     *
-     * GET /health
-     */
     suspend fun health(
         context: Context
     ): ApiResult {
@@ -339,20 +332,73 @@ object WaveApi {
         )
     }
 
-    /**
-     * إنشاء جلسة مستخدم جديدة.
-     *
-     * POST /api/session
+    /*
+     * REAL ACCOUNT REGISTRATION
      */
-    suspend fun createSession(
-        context: Context
+
+    suspend fun register(
+        context: Context,
+        username: String,
+        password: String,
+        displayName: String = ""
     ): Result<Session> {
+
+        val cleanUsername =
+            username.trim().lowercase()
+
+        val cleanPassword =
+            password
+
+        if (!Regex("^[a-z0-9_]{3,24}$")
+                .matches(cleanUsername)
+        ) {
+            return Result.failure(
+                Exception(
+                    "Username must be 3-24 characters"
+                )
+            )
+        }
+
+        if (
+            cleanPassword.length < 8 ||
+            cleanPassword.length > 128
+        ) {
+            return Result.failure(
+                Exception(
+                    "Password must be at least 8 characters"
+                )
+            )
+        }
+
+        val body =
+            JSONObject().apply {
+                put(
+                    "username",
+                    cleanUsername
+                )
+                put(
+                    "password",
+                    cleanPassword
+                )
+
+                if (
+                    displayName
+                        .trim()
+                        .isNotBlank()
+                ) {
+                    put(
+                        "displayName",
+                        displayName.trim()
+                    )
+                }
+            }
 
         val result =
             request(
                 context = context,
                 method = "POST",
-                path = "/api/session",
+                path = "/api/auth/register",
+                body = body,
                 authenticated = false
             )
 
@@ -360,23 +406,113 @@ object WaveApi {
             return Result.failure(
                 Exception(
                     result.error
-                        ?: "Unable to create session"
+                        ?: "Registration failed"
                 )
             )
         }
 
-        val json =
+        return parseSession(
+            context,
             result.data
-                ?: return Result.failure(
-                    Exception("Empty server response")
+        )
+    }
+
+    /*
+     * REAL ACCOUNT LOGIN
+     */
+
+    suspend fun login(
+        context: Context,
+        username: String,
+        password: String
+    ): Result<Session> {
+
+        val body =
+            JSONObject().apply {
+                put(
+                    "username",
+                    username.trim().lowercase()
                 )
+                put(
+                    "password",
+                    password
+                )
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path = "/api/auth/login",
+                body = body,
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Login failed"
+                )
+            )
+        }
+
+        return parseSession(
+            context,
+            result.data
+        )
+    }
+
+    /*
+     * LOGOUT
+     */
+
+    suspend fun logout(
+        context: Context
+    ): Result<Boolean> {
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path = "/api/auth/logout"
+            )
+
+        clearSession(context)
+
+        return if (result.success) {
+            Result.success(true)
+        } else {
+            Result.failure(
+                Exception(
+                    result.error
+                        ?: "Logout failed"
+                )
+            )
+        }
+    }
+
+    private fun parseSession(
+        context: Context,
+        json: JSONObject?
+    ): Result<Session> {
+
+        if (json == null) {
+            return Result.failure(
+                Exception(
+                    "Empty server response"
+                )
+            )
+        }
 
         val token =
             json.optString("token")
 
         if (token.isBlank()) {
             return Result.failure(
-                Exception("Session token missing")
+                Exception(
+                    "Session token missing"
+                )
             )
         }
 
@@ -390,7 +526,7 @@ object WaveApi {
                 json.optJSONObject("user")
             )
 
-        val session =
+        return Result.success(
             Session(
                 token = token,
                 user = user,
@@ -400,15 +536,44 @@ object WaveApi {
                         null
                     )
             )
-
-        return Result.success(session)
+        )
     }
 
-    /**
-     * الحصول على المستخدم الحالي.
-     *
-     * GET /api/me
+    /*
+     * BACKWARD COMPATIBILITY
      */
+
+    suspend fun createSession(
+        context: Context
+    ): Result<Session> {
+
+        val existing =
+            getToken(context)
+
+        if (!existing.isNullOrBlank()) {
+            val current =
+                me(context)
+
+            if (current.isSuccess) {
+                return Result.success(
+                    Session(
+                        token = existing,
+                        user = current.getOrNull(),
+                        expiresAt = null
+                    )
+                )
+            }
+
+            clearSession(context)
+        }
+
+        return Result.failure(
+            Exception(
+                "Please login or create an account"
+            )
+        )
+    }
+
     suspend fun me(
         context: Context
     ): Result<User> {
@@ -439,16 +604,231 @@ object WaveApi {
             Result.success(user)
         } else {
             Result.failure(
-                Exception("User data missing")
+                Exception(
+                    "User data missing"
+                )
             )
         }
     }
 
-    /**
-     * الحصول على الفيديوهات.
-     *
-     * GET /api/feed
+    /*
+     * MUSIC LIBRARY
      */
+
+    suspend fun getMusic(
+        context: Context
+    ): Result<List<MusicTrack>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/music",
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load music"
+                )
+            )
+        }
+
+        val array =
+            result.data
+                ?.optJSONArray("items")
+                ?: JSONArray()
+
+        val items =
+            mutableListOf<MusicTrack>()
+
+        for (i in 0 until array.length()) {
+
+            val item =
+                array.optJSONObject(i)
+                    ?: continue
+
+            val id =
+                item.optString("id")
+
+            if (id.isBlank()) {
+                continue
+            }
+
+            items.add(
+                MusicTrack(
+                    id = id,
+                    title =
+                        item.optString(
+                            "title"
+                        ),
+                    artist =
+                        item.optString(
+                            "artist"
+                        ),
+                    audioUrl =
+                        item.optString(
+                            "audio_url"
+                        ),
+                    coverUrl =
+                        item.optString(
+                            "cover_url",
+                            null
+                        ),
+                    durationSeconds =
+                        item.optInt(
+                            "duration_seconds",
+                            0
+                        )
+                )
+            )
+        }
+
+        return Result.success(items)
+    }
+
+    /*
+     * VISUAL FILTERS / EFFECTS
+     */
+
+    suspend fun getEffects(
+        context: Context
+    ): Result<List<VisualEffect>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/effects",
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load effects"
+                )
+            )
+        }
+
+        val array =
+            result.data
+                ?.optJSONArray("items")
+                ?: JSONArray()
+
+        val items =
+            mutableListOf<VisualEffect>()
+
+        for (i in 0 until array.length()) {
+
+            val item =
+                array.optJSONObject(i)
+                    ?: continue
+
+            val id =
+                item.optString("id")
+
+            if (id.isBlank()) {
+                continue
+            }
+
+            items.add(
+                VisualEffect(
+                    id = id,
+                    name =
+                        item.optString(
+                            "name"
+                        ),
+                    type =
+                        item.optString(
+                            "type"
+                        ),
+                    value =
+                        item.optString(
+                            "value"
+                        )
+                )
+            )
+        }
+
+        return Result.success(items)
+    }
+
+    /*
+     * GIFTS
+     */
+
+    suspend fun getGifts(
+        context: Context
+    ): Result<List<Gift>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/gifts"
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load gifts"
+                )
+            )
+        }
+
+        val array =
+            result.data
+                ?.optJSONArray("items")
+                ?: JSONArray()
+
+        val gifts =
+            mutableListOf<Gift>()
+
+        for (i in 0 until array.length()) {
+
+            val item =
+                array.optJSONObject(i)
+                    ?: continue
+
+            gifts.add(
+                Gift(
+                    id =
+                        item.optString("id"),
+                    name =
+                        item.optString("name"),
+                    price =
+                        item.optInt("price", 0),
+                    icon =
+                        item.optString(
+                            "icon",
+                            "🎁"
+                        ),
+                    imageUrl =
+                        item.optString(
+                            "imageUrl",
+                            null
+                        ),
+                    animationUrl =
+                        item.optString(
+                            "animationUrl",
+                            null
+                        )
+                )
+            )
+        }
+
+        return Result.success(gifts)
+    }
+
+    /*
+     * FEED
+     */
+
     suspend fun feed(
         context: Context,
         limit: Int = 20,
@@ -489,6 +869,7 @@ object WaveApi {
             mutableListOf<Video>()
 
         for (i in 0 until array.length()) {
+
             val item =
                 array.optJSONObject(i)
                     ?: continue
@@ -502,11 +883,10 @@ object WaveApi {
         return Result.success(videos)
     }
 
-    /**
-     * إنشاء فيديو.
-     *
-     * POST /api/videos
+    /*
+     * CREATE VIDEO
      */
+
     suspend fun createVideo(
         context: Context,
         videoUrl: String,
@@ -516,34 +896,51 @@ object WaveApi {
         musicName: String? = null
     ): Result<String> {
 
+        if (videoUrl.trim().isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Video URL is required"
+                )
+            )
+        }
+
         val body =
             JSONObject().apply {
 
                 put(
                     "videoUrl",
-                    videoUrl
+                    videoUrl.trim()
                 )
 
                 put(
                     "caption",
-                    caption
+                    caption.trim()
                 )
 
-                if (!thumbnailUrl.isNullOrBlank()) {
+                if (
+                    !thumbnailUrl
+                        .isNullOrBlank()
+                ) {
                     put(
                         "thumbnailUrl",
                         thumbnailUrl
                     )
                 }
 
-                if (!streamId.isNullOrBlank()) {
+                if (
+                    !streamId
+                        .isNullOrBlank()
+                ) {
                     put(
                         "streamId",
                         streamId
                     )
                 }
 
-                if (!musicName.isNullOrBlank()) {
+                if (
+                    !musicName
+                        .isNullOrBlank()
+                ) {
                     put(
                         "musicName",
                         musicName
@@ -579,16 +976,17 @@ object WaveApi {
             Result.success(id)
         } else {
             Result.failure(
-                Exception("Video ID missing")
+                Exception(
+                    "Video ID missing"
+                )
             )
         }
     }
 
-    /**
-     * إعجاب.
-     *
-     * POST /api/videos/{id}/like
+    /*
+     * LIKES
      */
+
     suspend fun likeVideo(
         context: Context,
         videoId: String
@@ -620,11 +1018,6 @@ object WaveApi {
         )
     }
 
-    /**
-     * إزالة الإعجاب.
-     *
-     * DELETE /api/videos/{id}/like
-     */
     suspend fun unlikeVideo(
         context: Context,
         videoId: String
@@ -656,11 +1049,10 @@ object WaveApi {
         )
     }
 
-    /**
-     * الحصول على التعليقات.
-     *
-     * GET /api/videos/{id}/comments
+    /*
+     * COMMENTS
      */
+
     suspend fun getComments(
         context: Context,
         videoId: String
@@ -692,11 +1084,6 @@ object WaveApi {
         )
     }
 
-    /**
-     * إضافة تعليق.
-     *
-     * POST /api/videos/{id}/comments
-     */
     suspend fun addComment(
         context: Context,
         videoId: String,
@@ -705,7 +1092,9 @@ object WaveApi {
 
         if (text.trim().isBlank()) {
             return Result.failure(
-                Exception("Comment cannot be empty")
+                Exception(
+                    "Comment cannot be empty"
+                )
             )
         }
 
@@ -744,11 +1133,10 @@ object WaveApi {
         )
     }
 
-    /**
-     * متابعة مستخدم.
-     *
-     * POST /api/users/{id}/follow
+    /*
+     * FOLLOW
      */
+
     suspend fun followUser(
         context: Context,
         userId: String
@@ -783,11 +1171,6 @@ object WaveApi {
         )
     }
 
-    /**
-     * إلغاء المتابعة.
-     *
-     * DELETE /api/users/{id}/follow
-     */
     suspend fun unfollowUser(
         context: Context,
         userId: String
@@ -812,19 +1195,25 @@ object WaveApi {
             )
         }
 
-        return Result.success(false)
+        return Result.success(
+            result.data
+                ?.optBoolean(
+                    "following",
+                    false
+                )
+                ?: false
+        )
     }
 
-    /**
-     * تحديث الملف الشخصي.
-     *
-     * PATCH /api/profile
+    /*
+     * UPDATE PROFILE
      */
+
     suspend fun updateProfile(
         context: Context,
         displayName: String? = null,
         bio: String? = null,
-        avatarUrl: String? = null
+        avatar: String? = null
     ): Result<User> {
 
         val body =
@@ -833,21 +1222,21 @@ object WaveApi {
                 if (displayName != null) {
                     put(
                         "displayName",
-                        displayName
+                        displayName.trim()
                     )
                 }
 
                 if (bio != null) {
                     put(
                         "bio",
-                        bio
+                        bio.trim()
                     )
                 }
 
-                if (avatarUrl != null) {
+                if (avatar != null) {
                     put(
-                        "avatarUrl",
-                        avatarUrl
+                        "avatar",
+                        avatar
                     )
                 }
             }
@@ -856,7 +1245,7 @@ object WaveApi {
             request(
                 context = context,
                 method = "PATCH",
-                path = "/api/profile",
+                path = "/api/me",
                 body = body
             )
 
@@ -879,104 +1268,61 @@ object WaveApi {
             Result.success(user)
         } else {
             Result.failure(
-                Exception("Updated user data missing")
-            )
-        }
-    }
-
-    /**
-     * الهدايا.
-     *
-     * GET /api/gifts
-     */
-    suspend fun getGifts(
-        context: Context
-    ): Result<List<Gift>> {
-
-        val result =
-            request(
-                context = context,
-                method = "GET",
-                path = "/api/gifts"
-            )
-
-        if (!result.success) {
-            return Result.failure(
                 Exception(
-                    result.error
-                        ?: "Unable to load gifts"
+                    "Profile data missing"
                 )
             )
         }
-
-        val array =
-            result.data
-                ?.optJSONArray("items")
-                ?: JSONArray()
-
-        val gifts =
-            mutableListOf<Gift>()
-
-        for (i in 0 until array.length()) {
-            val item =
-                array.optJSONObject(i)
-                    ?: continue
-
-            gifts.add(
-                Gift(
-                    id =
-                        item.optString("id"),
-                    name =
-                        item.optString("name"),
-                    price =
-                        item.optInt("price", 0),
-                    icon =
-                        item.optString(
-                            "icon",
-                            ""
-                        ),
-                    imageUrl =
-                        item.optString(
-                            "imageUrl",
-                            null
-                        ),
-                    animationUrl =
-                        item.optString(
-                            "animationUrl",
-                            null
-                        )
-                )
-            )
-        }
-
-        return Result.success(gifts)
     }
 
-    /**
-     * إنشاء بث مباشر.
-     *
-     * POST /api/live/create
+    /*
+     * LIVE
      */
+
     suspend fun createLive(
         context: Context,
-        title: String
+        title: String,
+        streamUrl: String? = null,
+        playbackUrl: String? = null,
+        rtmpsUrl: String? = null,
+        streamKey: String? = null
     ): Result<Live> {
-
-        val cleanTitle =
-            title.trim()
-
-        if (cleanTitle.isBlank()) {
-            return Result.failure(
-                Exception("Live title is required")
-            )
-        }
 
         val body =
             JSONObject().apply {
+
                 put(
                     "title",
-                    cleanTitle
+                    title.trim()
                 )
+
+                if (!streamUrl.isNullOrBlank()) {
+                    put(
+                        "streamUrl",
+                        streamUrl
+                    )
+                }
+
+                if (!playbackUrl.isNullOrBlank()) {
+                    put(
+                        "playbackUrl",
+                        playbackUrl
+                    )
+                }
+
+                if (!rtmpsUrl.isNullOrBlank()) {
+                    put(
+                        "rtmpsUrl",
+                        rtmpsUrl
+                    )
+                }
+
+                if (!streamKey.isNullOrBlank()) {
+                    put(
+                        "streamKey",
+                        streamKey
+                    )
+                }
             }
 
         val result =
@@ -1006,16 +1352,13 @@ object WaveApi {
             Result.success(live)
         } else {
             Result.failure(
-                Exception("Live data missing")
+                Exception(
+                    "Live data missing"
+                )
             )
         }
     }
 
-    /**
-     * الحصول على بث معين.
-     *
-     * GET /api/live/{id}
-     */
     suspend fun getLive(
         context: Context,
         liveId: String
@@ -1049,16 +1392,13 @@ object WaveApi {
             Result.success(live)
         } else {
             Result.failure(
-                Exception("Live data missing")
+                Exception(
+                    "Live data missing"
+                )
             )
         }
     }
 
-    /**
-     * تحديث حالة البث.
-     *
-     * PATCH /api/live/{id}
-     */
     suspend fun updateLive(
         context: Context,
         liveId: String,
@@ -1113,16 +1453,17 @@ object WaveApi {
             Result.success(live)
         } else {
             Result.failure(
-                Exception("Live data missing")
+                Exception(
+                    "Live data missing"
+                )
             )
         }
     }
 
-    /**
-     * إرسال هدية أثناء البث.
-     *
-     * POST /api/live/{id}/gifts
+    /*
+     * SEND GIFT
      */
+
     suspend fun sendGift(
         context: Context,
         liveId: String,
@@ -1130,9 +1471,6 @@ object WaveApi {
         quantity: Int = 1,
         receiverUserId: String? = null
     ): Result<GiftSendResult> {
-
-        val safeQuantity =
-            quantity.coerceIn(1, 100)
 
         val body =
             JSONObject().apply {
@@ -1144,10 +1482,13 @@ object WaveApi {
 
                 put(
                     "quantity",
-                    safeQuantity
+                    quantity.coerceIn(1, 100)
                 )
 
-                if (!receiverUserId.isNullOrBlank()) {
+                if (
+                    !receiverUserId
+                        .isNullOrBlank()
+                ) {
                     put(
                         "receiverUserId",
                         receiverUserId
@@ -1175,24 +1516,26 @@ object WaveApi {
             )
         }
 
-        val json =
+        val data =
             result.data
                 ?: return Result.failure(
-                    Exception("Empty gift response")
+                    Exception(
+                        "Gift response missing"
+                    )
                 )
 
         val gift =
-            json.optJSONObject("gift")
+            data.optJSONObject("gift")
 
         return Result.success(
             GiftSendResult(
                 transactionId =
-                    json.optString(
+                    data.optString(
                         "transactionId",
                         null
                     ),
                 remainingCoins =
-                    json.optInt(
+                    data.optInt(
                         "remainingCoins",
                         0
                     ),
@@ -1209,24 +1552,21 @@ object WaveApi {
                 quantity =
                     gift?.optInt(
                         "quantity",
-                        safeQuantity
-                    )
-                        ?: safeQuantity,
+                        quantity
+                    ) ?: quantity,
                 totalCoins =
                     gift?.optInt(
                         "totalCoins",
                         0
-                    )
-                        ?: 0
+                    ) ?: 0
             )
         )
     }
 
-    /**
-     * معلومات المحفظة.
-     *
-     * GET /api/wallet
+    /*
+     * WALLET
      */
+
     suspend fun getWallet(
         context: Context
     ): Result<Wallet> {
@@ -1247,78 +1587,71 @@ object WaveApi {
             )
         }
 
-        val json =
+        val data =
             result.data
                 ?: return Result.failure(
-                    Exception("Empty wallet response")
+                    Exception(
+                        "Wallet response missing"
+                    )
                 )
-
-        val numbersArray =
-            json.optJSONArray(
-                "walletNumbers"
-            )
-                ?: JSONArray()
 
         val numbers =
             mutableListOf<String>()
 
-        for (i in 0 until numbersArray.length()) {
-            numbers.add(
-                numbersArray.optString(i)
+        val numbersArray =
+            data.optJSONArray(
+                "walletNumbers"
             )
-        }
 
-        val methodsArray =
-            json.optJSONArray(
-                "paymentMethods"
-            )
-                ?: JSONArray()
+        if (numbersArray != null) {
+            for (
+                i in 0 until
+                    numbersArray.length()
+            ) {
+                numbers.add(
+                    numbersArray.optString(i)
+                )
+            }
+        }
 
         val methods =
             mutableListOf<String>()
 
-        for (i in 0 until methodsArray.length()) {
-            methods.add(
-                methodsArray.optString(i)
+        val methodsArray =
+            data.optJSONArray(
+                "paymentMethods"
             )
+
+        if (methodsArray != null) {
+            for (
+                i in 0 until
+                    methodsArray.length()
+            ) {
+                methods.add(
+                    methodsArray.optString(i)
+                )
+            }
         }
 
         return Result.success(
             Wallet(
                 coins =
-                    json.optInt(
+                    data.optInt(
                         "coins",
                         0
                     ),
-                walletNumbers =
-                    numbers,
-                paymentMethods =
-                    methods
+                walletNumbers = numbers,
+                paymentMethods = methods
             )
         )
     }
 
-    /**
-     * إرسال طلب شحن للمحفظة.
-     *
-     * POST /api/wallet/deposit
-     *
-     * ملاحظة:
-     * السيرفر يضع الطلب Pending ولا يضيف
-     * العملات حتى يتم التحقق من الدفع.
-     */
     suspend fun createWalletDeposit(
         context: Context,
         amount: Int,
         walletNumber: String,
         transactionReference: String? = null
-    ): Result<String> {
-
-        if (amount <= 0) {
-            return Result.failure(
-                Exception("Invalid amount")
-            )
-        }
+    ): Result<Deposit> {
 
         val body =
             JSONObject().apply {
@@ -1333,7 +1666,10 @@ object WaveApi {
                     walletNumber
                 )
 
-                if (!transactionReference.isNullOrBlank()) {
+                if (
+                    !transactionReference
+                        .isNullOrBlank()
+                ) {
                     put(
                         "transactionReference",
                         transactionReference
@@ -1353,34 +1689,46 @@ object WaveApi {
             return Result.failure(
                 Exception(
                     result.error
-                        ?: "Unable to submit deposit"
+                        ?: "Unable to create deposit"
                 )
             )
         }
 
-        val depositId =
+        val data =
             result.data
-                ?.optString(
-                    "depositId"
+                ?: return Result.failure(
+                    Exception(
+                        "Deposit response missing"
+                    )
                 )
-                ?.takeIf {
-                    it.isNotBlank()
-                }
 
-        return if (depositId != null) {
-            Result.success(depositId)
-        } else {
-            Result.failure(
-                Exception("Deposit ID missing")
+        return Result.success(
+            Deposit(
+                id =
+                    data.optString(
+                        "depositId"
+                    ),
+                amount = amount,
+                walletNumber =
+                    walletNumber,
+                transactionReference =
+                    transactionReference,
+                coins =
+                    data.optInt(
+                        "coins",
+                        amount
+                    ),
+                status =
+                    data.optString(
+                        "status",
+                        "pending"
+                    ),
+                createdAt = null,
+                updatedAt = null
             )
-        }
+        )
     }
 
-    /**
-     * سجل عمليات الشحن.
-     *
-     * GET /api/wallet/deposits
-     */
     suspend fun getWalletDeposits(
         context: Context
     ): Result<List<Deposit>> {
@@ -1389,7 +1737,8 @@ object WaveApi {
             request(
                 context = context,
                 method = "GET",
-                path = "/api/wallet/deposits"
+                path =
+                    "/api/wallet/deposits"
             )
 
         if (!result.success) {
@@ -1409,7 +1758,9 @@ object WaveApi {
         val deposits =
             mutableListOf<Deposit>()
 
-        for (i in 0 until array.length()) {
+        for (
+            i in 0 until array.length()
+        ) {
 
             val item =
                 array.optJSONObject(i)
@@ -1426,11 +1777,11 @@ object WaveApi {
                         ),
                     walletNumber =
                         item.optString(
-                            "walletNumber"
+                            "wallet_number"
                         ),
                     transactionReference =
                         item.optString(
-                            "transactionReference",
+                            "transaction_reference",
                             null
                         ),
                     coins =
@@ -1445,26 +1796,27 @@ object WaveApi {
                         ),
                     createdAt =
                         item.optString(
-                            "createdAt",
+                            "created_at",
                             null
                         ),
                     updatedAt =
                         item.optString(
-                            "updatedAt",
+                            "updated_at",
                             null
                         )
                 )
             )
         }
 
-        return Result.success(deposits)
+        return Result.success(
+            deposits
+        )
     }
 
-    /**
-     * إرسال بلاغ.
-     *
-     * POST /api/reports
+    /*
+     * REPORT
      */
+
     suspend fun report(
         context: Context,
         targetType: String,
@@ -1474,17 +1826,14 @@ object WaveApi {
 
         val body =
             JSONObject().apply {
-
                 put(
                     "targetType",
                     targetType
                 )
-
                 put(
                     "targetId",
                     targetId
                 )
-
                 put(
                     "reason",
                     reason
@@ -1518,9 +1867,6 @@ object WaveApi {
         )
     }
 
-    /**
-     * تحويل JSONObject إلى User.
-     */
     private fun parseUser(
         json: JSONObject?
     ): User? {
@@ -1540,13 +1886,11 @@ object WaveApi {
             id = id,
             username =
                 json.optString(
-                    "username",
-                    ""
+                    "username"
                 ),
             displayName =
                 json.optString(
-                    "displayName",
-                    ""
+                    "displayName"
                 ),
             avatar =
                 json.optString(
@@ -1581,19 +1925,16 @@ object WaveApi {
         )
     }
 
-    /**
-     * تحويل JSONObject إلى Video.
-     */
     private fun parseVideo(
-        json: JSONObject?
+        video: JSONObject?
     ): Video? {
 
-        if (json == null) {
+        if (video == null) {
             return null
         }
 
         val id =
-            json.optString("id")
+            video.optString("id")
 
         if (id.isBlank()) {
             return null
@@ -1602,91 +1943,83 @@ object WaveApi {
         return Video(
             id = id,
             userId =
-                json.optString(
-                    "userId",
-                    ""
+                video.optString(
+                    "userId"
                 ),
             username =
-                json.optString(
-                    "username",
-                    ""
+                video.optString(
+                    "username"
                 ),
             displayName =
-                json.optString(
-                    "displayName",
-                    ""
+                video.optString(
+                    "displayName"
                 ),
             avatar =
-                json.optString(
+                video.optString(
                     "avatar",
                     null
                 ),
             videoUrl =
-                json.optString(
-                    "videoUrl",
-                    ""
+                video.optString(
+                    "videoUrl"
                 ),
             thumbnailUrl =
-                json.optString(
+                video.optString(
                     "thumbnailUrl",
                     null
                 ),
             caption =
-                json.optString(
-                    "caption",
-                    ""
+                video.optString(
+                    "caption"
                 ),
             musicName =
-                json.optString(
+                video.optString(
                     "musicName",
                     null
                 ),
             likes =
-                json.optInt(
+                video.optInt(
                     "likes",
                     0
                 ),
             comments =
-                json.optInt(
+                video.optInt(
                     "comments",
                     0
                 ),
             shares =
-                json.optInt(
+                video.optInt(
                     "shares",
                     0
                 ),
             views =
-                json.optInt(
+                video.optInt(
                     "views",
                     0
                 ),
             liked =
-                json.optBoolean(
+                video.optBoolean(
                     "liked",
                     false
                 ),
             createdAt =
-                json.optString(
+                video.optString(
                     "createdAt",
                     null
                 )
         )
     }
 
-    /**
-     * تحويل JSONObject إلى Live.
-     */
     private fun parseLive(
-        json: JSONObject?
+        live: JSONObject?
     ): Live? {
 
-        if (json == null) {
+        if (live == null) {
             return null
         }
 
         val id =
-            json.optString("id")
+            live.optString("id")
 
         if (id.isBlank()) {
             return null
@@ -1695,87 +2028,77 @@ object WaveApi {
         return Live(
             id = id,
             userId =
-                json.optString(
-                    "userId",
-                    ""
+                live.optString(
+                    "userId"
                 ),
             username =
-                json.optString(
-                    "username",
-                    ""
+                live.optString(
+                    "username"
                 ),
             displayName =
-                json.optString(
-                    "displayName",
-                    ""
+                live.optString(
+                    "displayName"
                 ),
             avatar =
-                json.optString(
+                live.optString(
                     "avatar",
                     null
                 ),
             title =
-                json.optString(
-                    "title",
-                    ""
+                live.optString(
+                    "title"
                 ),
             streamUrl =
-                json.optString(
+                live.optString(
                     "streamUrl",
                     null
                 ),
             playbackUrl =
-                json.optString(
+                live.optString(
                     "playbackUrl",
                     null
                 ),
             rtmpsUrl =
-                json.optString(
+                live.optString(
                     "rtmpsUrl",
                     null
                 ),
             streamKey =
-                json.optString(
+                live.optString(
                     "streamKey",
                     null
                 ),
             viewerCount =
-                json.optInt(
+                live.optInt(
                     "viewerCount",
                     0
                 ),
             likes =
-                json.optInt(
+                live.optInt(
                     "likes",
                     0
                 ),
             status =
-                json.optString(
+                live.optString(
                     "status",
                     "active"
                 ),
             startedAt =
-                json.optString(
+                live.optString(
                     "startedAt",
                     null
                 )
         )
     }
 
-    /**
-     * حماية أجزاء URL.
-     */
     private fun encodePath(
         value: String
     ): String {
-        return java.net.URLEncoder
+        return URLEncoder
             .encode(
                 value,
                 "UTF-8"
             )
-            .replace(
-                "+",
-                "%20"
-            )
+            .replace("+", "%20")
     }
 }
