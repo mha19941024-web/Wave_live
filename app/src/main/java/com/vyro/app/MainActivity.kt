@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -24,16 +25,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +57,8 @@ private val WaveDark = Color(0xFF09070F)
 private val WaveCard = Color(0xFF17121F)
 private val WaveText = Color(0xFFF7F3FF)
 private val WaveMuted = Color(0xFFAAA1B8)
+private val WaveGreen = Color(0xFF22C55E)
+private val WaveGold = Color(0xFFFFD54F)
 
 class MainActivity : ComponentActivity() {
 
@@ -79,7 +80,7 @@ private fun WaveRoot() {
     }
 
     LaunchedEffect(Unit) {
-        delay(1800)
+        delay(1500)
         showSplash = false
     }
 
@@ -111,7 +112,7 @@ private fun SplashScreen() {
         ) {
             Box(
                 modifier = Modifier
-                    .size(110.dp)
+                    .size(112.dp)
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
@@ -132,7 +133,7 @@ private fun SplashScreen() {
             }
 
             Spacer(
-                modifier = Modifier.height(22.dp)
+                modifier = Modifier.height(20.dp)
             )
 
             Text(
@@ -145,15 +146,15 @@ private fun SplashScreen() {
             Text(
                 text = "Wave Live",
                 color = WaveMuted,
-                fontSize = 16.sp
+                fontSize = 15.sp
             )
 
             Spacer(
-                modifier = Modifier.height(28.dp)
+                modifier = Modifier.height(24.dp)
             )
 
             Text(
-                text = "LIVE • MUSIC • FRIENDS",
+                text = "LIVE  •  MUSIC  •  FRIENDS",
                 color = WavePurple,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
@@ -170,7 +171,6 @@ private enum class WaveTab {
     PROFILE
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WaveApp() {
     var selectedTab by remember {
@@ -178,127 +178,24 @@ private fun WaveApp() {
     }
 
     var coins by remember {
-        mutableIntStateOf(1250)
+        mutableIntStateOf(0)
     }
 
     Scaffold(
         containerColor = WaveDark,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = when (selectedTab) {
-                            WaveTab.HOME -> "WAVE"
-                            WaveTab.LIVE -> "LIVE"
-                            WaveTab.CREATE -> "Create Live"
-                            WaveTab.INBOX -> "Inbox"
-                            WaveTab.PROFILE -> "Profile"
-                        },
-                        color = WaveText,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                },
-                actions = {
-                    Text(
-                        text = "🪙 $coins",
-                        color = Color(0xFFFFD54F),
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(
-                            end = 14.dp
-                        )
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = WaveDark
-                )
+            WaveTopBar(
+                selectedTab = selectedTab,
+                coins = coins
             )
         },
         bottomBar = {
-            NavigationBar(
-                modifier = Modifier.navigationBarsPadding(),
-                containerColor = Color(0xFF100C16)
-            ) {
-                NavigationBarItem(
-                    selected = selectedTab == WaveTab.HOME,
-                    onClick = {
-                        selectedTab = WaveTab.HOME
-                    },
-                    icon = {
-                        Text(
-                            text = "⌂",
-                            fontSize = 22.sp
-                        )
-                    },
-                    label = {
-                        Text("Home")
-                    }
-                )
-
-                NavigationBarItem(
-                    selected = selectedTab == WaveTab.LIVE,
-                    onClick = {
-                        selectedTab = WaveTab.LIVE
-                    },
-                    icon = {
-                        Text(
-                            text = "●",
-                            fontSize = 20.sp
-                        )
-                    },
-                    label = {
-                        Text("LIVE")
-                    }
-                )
-
-                NavigationBarItem(
-                    selected = selectedTab == WaveTab.CREATE,
-                    onClick = {
-                        selectedTab = WaveTab.CREATE
-                    },
-                    icon = {
-                        Text(
-                            text = "+",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    label = {
-                        Text("Create")
-                    }
-                )
-
-                NavigationBarItem(
-                    selected = selectedTab == WaveTab.INBOX,
-                    onClick = {
-                        selectedTab = WaveTab.INBOX
-                    },
-                    icon = {
-                        Text(
-                            text = "✉",
-                            fontSize = 21.sp
-                        )
-                    },
-                    label = {
-                        Text("Inbox")
-                    }
-                )
-
-                NavigationBarItem(
-                    selected = selectedTab == WaveTab.PROFILE,
-                    onClick = {
-                        selectedTab = WaveTab.PROFILE
-                    },
-                    icon = {
-                        Text(
-                            text = "●",
-                            fontSize = 21.sp
-                        )
-                    },
-                    label = {
-                        Text("Profile")
-                    }
-                )
-            }
+            WaveBottomBar(
+                selectedTab = selectedTab,
+                onSelect = {
+                    selectedTab = it
+                }
+            )
         }
     ) { paddingValues ->
 
@@ -308,6 +205,7 @@ private fun WaveApp() {
                 .padding(paddingValues)
         ) {
             when (selectedTab) {
+
                 WaveTab.HOME -> {
                     HomeScreen(
                         onOpenLive = {
@@ -349,6 +247,195 @@ private fun WaveApp() {
 }
 
 @Composable
+private fun WaveTopBar(
+    selectedTab: WaveTab,
+    coins: Int
+) {
+    val title = when (selectedTab) {
+        WaveTab.HOME -> "WAVE"
+        WaveTab.LIVE -> "LIVE"
+        WaveTab.CREATE -> "CREATE"
+        WaveTab.INBOX -> "INBOX"
+        WaveTab.PROFILE -> "PROFILE"
+    }
+
+    TopAppBar(
+        title = {
+            Text(
+                text = title,
+                color = WaveText,
+                fontWeight = FontWeight.ExtraBold
+            )
+        },
+        actions = {
+            CoinBadge(
+                coins = coins
+            )
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = WaveDark
+        )
+    )
+}
+
+@Composable
+private fun CoinBadge(
+    coins: Int
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF211A2B)
+        ),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.padding(end = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = 12.dp,
+                vertical = 7.dp
+            ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "COINS",
+                color = WaveGold,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(
+                modifier = Modifier.width(7.dp)
+            )
+
+            Text(
+                text = coins.toString(),
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun WaveBottomBar(
+    selectedTab: WaveTab,
+    onSelect: (WaveTab) -> Unit
+) {
+    NavigationBar(
+        modifier = Modifier.navigationBarsPadding(),
+        containerColor = Color(0xFF100C16)
+    ) {
+        NavigationBarItem(
+            selected = selectedTab == WaveTab.HOME,
+            onClick = {
+                onSelect(WaveTab.HOME)
+            },
+            icon = {
+                SimpleNavMark(
+                    text = "H",
+                    selected = selectedTab == WaveTab.HOME
+                )
+            },
+            label = {
+                Text("Home")
+            }
+        )
+
+        NavigationBarItem(
+            selected = selectedTab == WaveTab.LIVE,
+            onClick = {
+                onSelect(WaveTab.LIVE)
+            },
+            icon = {
+                SimpleNavMark(
+                    text = "L",
+                    selected = selectedTab == WaveTab.LIVE
+                )
+            },
+            label = {
+                Text("Live")
+            }
+        )
+
+        NavigationBarItem(
+            selected = selectedTab == WaveTab.CREATE,
+            onClick = {
+                onSelect(WaveTab.CREATE)
+            },
+            icon = {
+                SimpleNavMark(
+                    text = "+",
+                    selected = selectedTab == WaveTab.CREATE
+                )
+            },
+            label = {
+                Text("Create")
+            }
+        )
+
+        NavigationBarItem(
+            selected = selectedTab == WaveTab.INBOX,
+            onClick = {
+                onSelect(WaveTab.INBOX)
+            },
+            icon = {
+                SimpleNavMark(
+                    text = "M",
+                    selected = selectedTab == WaveTab.INBOX
+                )
+            },
+            label = {
+                Text("Inbox")
+            }
+        )
+
+        NavigationBarItem(
+            selected = selectedTab == WaveTab.PROFILE,
+            onClick = {
+                onSelect(WaveTab.PROFILE)
+            },
+            icon = {
+                SimpleNavMark(
+                    text = "P",
+                    selected = selectedTab == WaveTab.PROFILE
+                )
+            },
+            label = {
+                Text("Profile")
+            }
+        )
+    }
+}
+
+@Composable
+private fun SimpleNavMark(
+    text: String,
+    selected: Boolean
+) {
+    Box(
+        modifier = Modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .background(
+                if (selected) {
+                    WavePurple
+                } else {
+                    Color(0xFF2A2333)
+                }
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.ExtraBold
+        )
+    }
+}
+
+@Composable
 private fun HomeScreen(
     onOpenLive: () -> Unit
 ) {
@@ -365,7 +452,7 @@ private fun HomeScreen(
             )
 
             Text(
-                text = "Welcome to Wave 👋",
+                text = "Welcome to Wave",
                 color = WaveText,
                 fontSize = 25.sp,
                 fontWeight = FontWeight.Bold
@@ -401,7 +488,6 @@ private fun HomeScreen(
                 "Nour Chat"
             )
         ) { name ->
-
             LiveRoomCard(
                 name = name,
                 onClick = onOpenLive
@@ -449,9 +535,9 @@ private fun LiveHeroCard(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "●",
+                    text = "LIVE",
                     color = Color.White,
-                    fontSize = 48.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
 
@@ -462,14 +548,14 @@ private fun LiveHeroCard(
                 Text(
                     text = "GO LIVE",
                     color = Color.White,
-                    fontSize = 28.sp,
+                    fontSize = 30.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
 
                 Text(
-                    text = "Join the Wave",
+                    text = "Start broadcasting on Wave",
                     color = Color.White.copy(
-                        alpha = 0.8f
+                        alpha = 0.85f
                     ),
                     fontSize = 14.sp
                 )
@@ -536,16 +622,16 @@ private fun LiveRoomCard(
                 )
 
                 Text(
-                    text = "● LIVE now",
-                    color = Color(0xFF22C55E),
+                    text = "LIVE NOW",
+                    color = WaveGreen,
                     fontSize = 12.sp
                 )
             }
 
             Text(
-                text = "▶",
+                text = "OPEN",
                 color = WavePurple,
-                fontSize = 20.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -569,6 +655,7 @@ private fun LiveScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -582,11 +669,13 @@ private fun LiveScreen(
                         )
                     )
             ) {
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(20.dp)
                 ) {
+
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -594,7 +683,14 @@ private fun LiveScreen(
                             modifier = Modifier
                                 .size(46.dp)
                                 .clip(CircleShape)
-                                .background(WavePurple),
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            WavePurple,
+                                            WavePink
+                                        )
+                                    )
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -617,7 +713,7 @@ private fun LiveScreen(
                             )
 
                             Text(
-                                text = "12.4K watching",
+                                text = "LIVE ROOM",
                                 color = Color.LightGray,
                                 fontSize = 12.sp
                             )
@@ -631,15 +727,19 @@ private fun LiveScreen(
                     Text(
                         text = "LIVE",
                         color = Color.White,
-                        fontSize = 38.sp,
+                        fontSize = 42.sp,
                         fontWeight = FontWeight.ExtraBold,
                         modifier = Modifier.align(
                             Alignment.CenterHorizontally
                         )
                     )
 
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
+
                     Text(
-                        text = "Live video preview",
+                        text = "Live room",
                         color = WaveMuted,
                         modifier = Modifier.align(
                             Alignment.CenterHorizontally
@@ -661,25 +761,22 @@ private fun LiveScreen(
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = {}
-                ) {
-                    Text(
-                        text = "♥",
-                        color = Color(0xFFFF4D88),
-                        fontSize = 26.sp
-                    )
-                }
 
-                IconButton(
-                    onClick = {}
-                ) {
-                    Text(
-                        text = "➤",
-                        color = Color.White,
-                        fontSize = 23.sp
-                    )
-                }
+                Text(
+                    text = "LIKE",
+                    color = Color(0xFFFF4D88),
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(
+                    modifier = Modifier.width(18.dp)
+                )
+
+                Text(
+                    text = "SHARE",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
 
                 Spacer(
                     modifier = Modifier.weight(1f)
@@ -693,7 +790,7 @@ private fun LiveScreen(
                         containerColor = WavePurple
                     )
                 ) {
-                    Text("🎁 Gifts")
+                    Text("GIFTS")
                 }
             }
         }
@@ -704,8 +801,8 @@ private fun LiveScreen(
                 onClose = {
                     showGifts = false
                 },
-                onGift = {
-                    onGiftSent(it)
+                onGift = { price ->
+                    onGiftSent(price)
                     showGifts = false
                 }
             )
@@ -715,7 +812,7 @@ private fun LiveScreen(
 
 private data class WaveGift(
     val name: String,
-    val emoji: String,
+    val mark: String,
     val price: Int
 )
 
@@ -728,27 +825,32 @@ private fun GiftPanel(
     val gifts = listOf(
         WaveGift(
             name = "Rose",
-            emoji = "🌹",
+            mark = "R",
             price = 5
         ),
         WaveGift(
             name = "Heart",
-            emoji = "💖",
-            price = 20
+            mark = "H",
+            price = 10
         ),
         WaveGift(
             name = "Diamond",
-            emoji = "💎",
-            price = 100
-        ),
-        WaveGift(
-            name = "Crown",
-            emoji = "👑",
-            price = 500
+            mark = "D",
+            price = 250
         ),
         WaveGift(
             name = "Wave Crown",
-            emoji = "👑",
+            mark = "C",
+            price = 500
+        ),
+        WaveGift(
+            name = "Wave Rocket",
+            mark = "X",
+            price = 500
+        ),
+        WaveGift(
+            name = "Lion",
+            mark = "L",
             price = 1000
         )
     )
@@ -757,12 +859,11 @@ private fun GiftPanel(
         modifier = Modifier
             .fillMaxSize()
             .background(
-                Color.Black.copy(
-                    alpha = 0.65f
-                )
+                Color.Black.copy(alpha = 0.70f)
             ),
         contentAlignment = Alignment.BottomCenter
     ) {
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(
@@ -773,9 +874,11 @@ private fun GiftPanel(
                 containerColor = Color(0xFF17121F)
             )
         ) {
+
             Column(
                 modifier = Modifier.padding(18.dp)
             ) {
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -788,8 +891,8 @@ private fun GiftPanel(
                     )
 
                     Text(
-                        text = "🪙 $coins",
-                        color = Color(0xFFFFD54F),
+                        text = coins.toString(),
+                        color = WaveGold,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -817,7 +920,7 @@ private fun GiftPanel(
                     onClick = onClose,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Close")
+                    Text("CLOSE")
                 }
             }
         }
@@ -843,12 +946,14 @@ private fun GiftRow(
         ),
         shape = RoundedCornerShape(16.dp)
     ) {
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+
             Box(
                 modifier = Modifier
                     .size(54.dp)
@@ -864,8 +969,10 @@ private fun GiftRow(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = gift.emoji,
-                    fontSize = 29.sp
+                    text = gift.mark,
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold
                 )
             }
 
@@ -882,7 +989,7 @@ private fun GiftRow(
 
                 Text(
                     text = "${gift.price} coins",
-                    color = Color(0xFFFFD54F),
+                    color = WaveGold,
                     fontSize = 13.sp
                 )
             }
@@ -894,7 +1001,7 @@ private fun GiftRow(
                     containerColor = WavePurple
                 )
             ) {
-                Text("Send")
+                Text("SEND")
             }
         }
     }
@@ -913,6 +1020,7 @@ private fun CreateLiveScreen() {
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+
         Spacer(
             modifier = Modifier.height(20.dp)
         )
@@ -932,9 +1040,10 @@ private fun CreateLiveScreen() {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "●",
+                text = "W",
                 color = Color.White,
-                fontSize = 42.sp
+                fontSize = 42.sp,
+                fontWeight = FontWeight.ExtraBold
             )
         }
 
@@ -944,12 +1053,12 @@ private fun CreateLiveScreen() {
 
         Text(
             text = if (started) {
-                "Live Ready"
+                "LIVE READY"
             } else {
-                "Start your Live"
+                "START YOUR LIVE"
             },
             color = Color.White,
-            fontSize = 28.sp,
+            fontSize = 26.sp,
             fontWeight = FontWeight.ExtraBold
         )
 
@@ -959,9 +1068,9 @@ private fun CreateLiveScreen() {
 
         Text(
             text = if (started) {
-                "Your live session is ready."
+                "Your live room is ready."
             } else {
-                "Create a live room and connect with your audience."
+                "Create your live room and connect with your audience."
             },
             color = WaveMuted,
             textAlign = TextAlign.Center
@@ -982,9 +1091,9 @@ private fun CreateLiveScreen() {
         ) {
             Text(
                 text = if (started) {
-                    "Stop Preview"
+                    "STOP PREVIEW"
                 } else {
-                    "Start Live"
+                    "START LIVE"
                 },
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold
@@ -996,6 +1105,7 @@ private fun CreateLiveScreen() {
         )
 
         if (started) {
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -1006,7 +1116,7 @@ private fun CreateLiveScreen() {
                     modifier = Modifier.padding(18.dp)
                 ) {
                     Text(
-                        text = "Stream Settings",
+                        text = "LIVE SESSION",
                         color = Color.White,
                         fontWeight = FontWeight.Bold
                     )
@@ -1016,13 +1126,13 @@ private fun CreateLiveScreen() {
                     )
 
                     Text(
-                        text = "RTMPS URL",
+                        text = "RTMPS",
                         color = WaveMuted,
                         fontSize = 12.sp
                     )
 
                     Text(
-                        text = "Configure your live server from the Wave backend.",
+                        text = "Wave live server",
                         color = Color.White,
                         fontSize = 14.sp
                     )
@@ -1042,11 +1152,21 @@ private fun InboxScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "✉",
-            color = WavePurple,
-            fontSize = 70.sp
-        )
+
+        Box(
+            modifier = Modifier
+                .size(82.dp)
+                .clip(CircleShape)
+                .background(WavePurple),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "M",
+                color = Color.White,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
 
         Spacer(
             modifier = Modifier.height(18.dp)
@@ -1064,7 +1184,7 @@ private fun InboxScreen() {
         )
 
         Text(
-            text = "Notifications and messages will appear here.",
+            text = "Messages and notifications will appear here.",
             color = WaveMuted,
             textAlign = TextAlign.Center
         )
@@ -1076,18 +1196,164 @@ private fun ProfileScreen(
     coins: Int,
     onAddCoins: () -> Unit
 ) {
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(WaveDark)
             .padding(18.dp)
     ) {
+
+        item {
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+                Box(
+                    modifier = Modifier
+                        .size(82.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    WavePurple,
+                                    WavePink
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "W",
+                        color = Color.White,
+                        fontSize = 34.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.padding(
+                        start = 15.dp
+                    )
+                ) {
+
+                    Text(
+                        text = "Wave User",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "@waveuser",
+                        color = WaveMuted
+                    )
+                }
+            }
+
+            Spacer(
+                modifier = Modifier.height(25.dp)
+            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = WaveCard
+                ),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "WAVE COINS",
+                            color = WaveMuted
+                        )
+
+                        Text(
+                            text = coins.toString(),
+                            color = Color.White,
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+
+                    Button(
+                        onClick = onAddCoins,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = WavePurple
+                        )
+                    ) {
+                        Text("+500")
+                    }
+                }
+            }
+
+            Spacer(
+                modifier = Modifier.height(16.dp)
+            )
+
+            ProfileOption(
+                mark = "C",
+                title = "Wallet & Coins"
+            )
+
+            ProfileOption(
+                mark = "G",
+                title = "My Gifts"
+            )
+
+            ProfileOption(
+                mark = "M",
+                title = "My Videos"
+            )
+
+            ProfileOption(
+                mark = "S",
+                title = "Settings"
+            )
+
+            ProfileOption(
+                mark = "A",
+                title = "Agency"
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileOption(
+    mark: String,
+    title: String
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = WaveCard
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+
         Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+
             Box(
                 modifier = Modifier
-                    .size(82.dp)
+                    .size(42.dp)
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
@@ -1100,128 +1366,11 @@ private fun ProfileScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "W",
+                    text = mark,
                     color = Color.White,
-                    fontSize = 34.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
             }
-
-            Column(
-                modifier = Modifier.padding(
-                    start = 15.dp
-                )
-            ) {
-                Text(
-                    text = "Wave User",
-                    color = Color.White,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = "@waveuser",
-                    color = WaveMuted
-                )
-            }
-        }
-
-        Spacer(
-            modifier = Modifier.height(25.dp)
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = WaveCard
-            ),
-            shape = RoundedCornerShape(20.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "🪙",
-                    fontSize = 32.sp
-                )
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 12.dp)
-                ) {
-                    Text(
-                        text = "Wave Coins",
-                        color = WaveMuted
-                    )
-
-                    Text(
-                        text = coins.toString(),
-                        color = Color.White,
-                        fontSize = 25.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-
-                Button(
-                    onClick = onAddCoins,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = WavePurple
-                    )
-                ) {
-                    Text("+500")
-                }
-            }
-        }
-
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
-
-        ProfileOption(
-            iconText = "🪙",
-            title = "Wallet & Coins"
-        )
-
-        ProfileOption(
-            iconText = "🎁",
-            title = "My Gifts"
-        )
-
-        ProfileOption(
-            iconText = "⚙",
-            title = "Settings"
-        )
-    }
-}
-
-@Composable
-private fun ProfileOption(
-    iconText: String,
-    title: String
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 5.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = WaveCard
-        ),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = iconText,
-                fontSize = 25.sp
-            )
 
             Text(
                 text = title,
