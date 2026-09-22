@@ -1,0 +1,13 @@
+name = "vyro-wave-api"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[vars]
+ENVIRONMENT = "production"
+SESSION_DAYS = "30"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "vyro-wave-prod"
+database_id = "REPLACE_WITH_YOUR_REAL_D1_DATABASE_ID"
+migrations_dir = "./migrations"
