@@ -17,6 +17,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
+      - name: Check Java
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "===== JAVA ====="
+          java -version
+
       - name: Check project files
         shell: bash
         run: |
@@ -25,6 +33,7 @@ jobs:
           echo "===== ROOT ====="
           ls -la
 
+          echo ""
           echo "===== REQUIRED FILES ====="
 
           required_files=(
@@ -47,22 +56,40 @@ jobs:
           done
 
           if [ "$missing" -ne 0 ]; then
+            echo ""
             echo "===== REQUIRED FILES ARE MISSING ====="
             exit 1
           fi
 
+          echo ""
           echo "===== ALL REQUIRED FILES EXIST ====="
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@4d7e8ed3d6f2f1e8a1e8d6e4a0c7f5c8d3b2a1f0
-        with:
-          distribution: temurin
-          java-version: "17"
+      - name: Install Gradle 8.9
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@ed408507eac070d3e8c2e8f3b7e3c1d5a5f0a2d9
-        with:
-          gradle-version: "8.9"
+          GRADLE_VERSION="8.9"
+          GRADLE_DIR="$HOME/gradle"
+
+          echo "===== DOWNLOADING GRADLE ${GRADLE_VERSION} ====="
+
+          mkdir -p "$GRADLE_DIR"
+
+          curl -fL \
+            "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+            -o "$GRADLE_DIR/gradle.zip"
+
+          unzip -q -o \
+            "$GRADLE_DIR/gradle.zip" \
+            -d "$GRADLE_DIR"
+
+          echo "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+
+          echo ""
+          echo "===== GRADLE VERSION ====="
+
+          "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin/gradle" --version
 
       - name: Build Debug APK
         shell: bash
@@ -80,11 +107,15 @@ jobs:
 
           APK="app/build/outputs/apk/debug/app-debug.apk"
 
+          echo "===== CHECKING APK ====="
+
           if [ ! -f "$APK" ]; then
-            echo "APK NOT FOUND: $APK"
+            echo "APK NOT FOUND:"
+            echo "$APK"
             exit 1
           fi
 
+          echo ""
           echo "===== APK CREATED SUCCESSFULLY ====="
           ls -lh "$APK"
 
