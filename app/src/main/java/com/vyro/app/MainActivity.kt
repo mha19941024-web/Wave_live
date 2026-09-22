@@ -25,12 +25,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -55,7 +57,6 @@ private val WavePurple = Color(0xFF8B5CF6)
 private val WavePink = Color(0xFFEC4899)
 private val WaveGold = Color(0xFFFFD54F)
 private val WaveGreen = Color(0xFF22C55E)
-private val WaveRed = Color(0xFFEF4444)
 private val WaveText = Color(0xFFF8F5FF)
 private val WaveMuted = Color(0xFFA9A1B5)
 
@@ -97,20 +98,25 @@ private fun WaveApp() {
         mutableStateOf(false)
     }
 
+    /*
+     * مهم:
+     * LocalContext.current يتم استدعاؤه هنا داخل Composable
+     * ثم نستخدم قيمة context داخل LaunchedEffect.
+     */
+    val context = LocalContext.current
+
     LaunchedEffect(Unit) {
+
         delay(900)
 
-        val preferences =
-            androidx.compose.ui.platform.LocalContext.current
-                .getSharedPreferences(
-                    "vyro_session",
-                    Context.MODE_PRIVATE
-                )
+        val preferences = context.getSharedPreferences(
+            "vyro_session",
+            Context.MODE_PRIVATE
+        )
 
-        loggedIn =
-            !preferences
-                .getString("session", null)
-                .isNullOrBlank()
+        loggedIn = !preferences
+            .getString("session", null)
+            .isNullOrBlank()
     }
 
     if (showLogin) {
@@ -133,6 +139,7 @@ private fun WaveApp() {
         containerColor = WaveDark,
 
         bottomBar = {
+
             NavigationBar(
                 containerColor = Color(0xFF100C16)
             ) {
@@ -144,7 +151,7 @@ private fun WaveApp() {
                     },
                     icon = {
                         Text(
-                            "H",
+                            text = "H",
                             fontWeight = FontWeight.Bold
                         )
                     },
@@ -160,7 +167,7 @@ private fun WaveApp() {
                     },
                     icon = {
                         Text(
-                            "L",
+                            text = "L",
                             fontWeight = FontWeight.Bold
                         )
                     },
@@ -176,7 +183,7 @@ private fun WaveApp() {
                     },
                     icon = {
                         Text(
-                            "+",
+                            text = "+",
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -193,7 +200,7 @@ private fun WaveApp() {
                     },
                     icon = {
                         Text(
-                            "M",
+                            text = "M",
                             fontWeight = FontWeight.Bold
                         )
                     },
@@ -209,7 +216,7 @@ private fun WaveApp() {
                     },
                     icon = {
                         Text(
-                            "P",
+                            text = "P",
                             fontWeight = FontWeight.Bold
                         )
                     },
@@ -219,24 +226,23 @@ private fun WaveApp() {
                 )
             }
         }
-    ) { padding ->
+    ) { paddingValues ->
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(paddingValues)
                 .background(WaveDark)
         ) {
 
             WaveHeader(
-                title =
-                    when (selectedTab) {
-                        WaveTab.HOME -> "WAVE"
-                        WaveTab.LIVE -> "LIVE"
-                        WaveTab.CREATE -> "CREATE"
-                        WaveTab.INBOX -> "INBOX"
-                        WaveTab.PROFILE -> "PROFILE"
-                    },
+                title = when (selectedTab) {
+                    WaveTab.HOME -> "WAVE"
+                    WaveTab.LIVE -> "LIVE"
+                    WaveTab.CREATE -> "CREATE"
+                    WaveTab.INBOX -> "INBOX"
+                    WaveTab.PROFILE -> "PROFILE"
+                },
                 coins = coins
             )
 
@@ -315,11 +321,15 @@ private fun WaveHeader(
             text = title,
             color = WaveText,
             fontSize = 22.sp,
-            fontWeight = FontWeight.ExtraBold,
-            modifier = Modifier.weight(1f)
+            fontWeight = FontWeight.ExtraBold
+        )
+
+        Spacer(
+            modifier = Modifier.width(12.dp)
         )
 
         Card(
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(
                 containerColor = Color(0xFF211A2B)
@@ -331,7 +341,8 @@ private fun WaveHeader(
                     horizontal = 12.dp,
                     vertical = 7.dp
                 ),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
             ) {
 
                 Text(
@@ -364,8 +375,7 @@ private fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 14.dp),
-        verticalArrangement =
-            Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
 
         item {
@@ -414,13 +424,11 @@ private fun HomeScreen(
                                 )
                             )
                         ),
-                    contentAlignment =
-                        Alignment.Center
+                    contentAlignment = Alignment.Center
                 ) {
 
                     Column(
-                        horizontalAlignment =
-                            Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
 
                         Text(
@@ -439,9 +447,7 @@ private fun HomeScreen(
 
                         Text(
                             text = "Join live creators on Wave",
-                            color = Color.White.copy(
-                                alpha = 0.85f
-                            )
+                            color = Color.White.copy(alpha = 0.85f)
                         )
                     }
                 }
@@ -484,8 +490,7 @@ private fun HomeScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(12.dp),
-                    verticalAlignment =
-                        Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
 
                     Box(
@@ -500,24 +505,23 @@ private fun HomeScreen(
                                     )
                                 )
                             ),
-                        contentAlignment =
-                            Alignment.Center
+                        contentAlignment = Alignment.Center
                     ) {
 
                         Text(
-                            text = name
-                                .first()
-                                .toString(),
+                            text = name.first().toString(),
                             color = Color.White,
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
+                    Spacer(
+                        modifier = Modifier.width(12.dp)
+                    )
+
                     Column(
-                        modifier = Modifier
-                            .padding(start = 12.dp)
-                            .weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
 
                         Text(
@@ -532,13 +536,6 @@ private fun HomeScreen(
                             fontSize = 12.sp
                         )
                     }
-
-                    Text(
-                        text = "OPEN",
-                        color = WavePurple,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
                 }
             }
         }
@@ -568,7 +565,13 @@ private fun LiveScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .height(0.dp)
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(420.dp)
                     .background(
                         Brush.verticalGradient(
                             listOf(
@@ -577,109 +580,99 @@ private fun LiveScreen(
                             )
                         )
                     )
+                    .padding(18.dp)
             ) {
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(18.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
 
-                    Row(
-                        verticalAlignment =
-                            Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        WavePurple,
+                                        WavePink
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
 
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(
-                                            WavePurple,
-                                            WavePink
-                                        )
-                                    )
-                                ),
-                            contentAlignment =
-                                Alignment.Center
-                        ) {
-
-                            Text(
-                                "W",
-                                color = Color.White,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Column(
-                            modifier = Modifier
-                                .padding(start = 10.dp)
-                        ) {
-
-                            Text(
-                                "Wave Creator",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Text(
-                                "LIVE ROOM",
-                                color = WaveGreen,
-                                fontSize = 12.sp
-                            )
-                        }
+                        Text(
+                            text = "W",
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     Spacer(
-                        modifier = Modifier.height(18.dp)
+                        modifier = Modifier.width(10.dp)
                     )
 
-                    Text(
-                        text = "Live streaming",
-                        color = Color.White,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
+                    Column {
 
-                    Text(
-                        text = "Real-time creator room",
-                        color = WaveMuted
-                    )
-
-                    Spacer(
-                        modifier = Modifier.height(20.dp)
-                    )
-
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor =
-                                Color.White.copy(
-                                    alpha = 0.08f
-                                )
+                        Text(
+                            text = "Wave Creator",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
                         )
+
+                        Text(
+                            text = "LIVE ROOM",
+                            color = WaveGreen,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                Spacer(
+                    modifier = Modifier.height(18.dp)
+                )
+
+                Text(
+                    text = "Live streaming",
+                    color = Color.White,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+
+                Text(
+                    text = "Real-time creator room",
+                    color = WaveMuted
+                )
+
+                Spacer(
+                    modifier = Modifier.height(20.dp)
+                )
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.08f)
+                    )
+                ) {
+
+                    Column(
+                        modifier = Modifier.padding(16.dp)
                     ) {
 
-                        Column(
-                            modifier = Modifier.padding(16.dp)
-                        ) {
+                        Text(
+                            text = "Stream status",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
 
-                            Text(
-                                "Stream status",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Text(
-                                "Ready",
-                                color = WaveGreen,
-                                fontSize = 14.sp
-                            )
-                        }
+                        Text(
+                            text = "Ready",
+                            color = WaveGreen,
+                            fontSize = 14.sp
+                        )
                     }
                 }
             }
@@ -687,16 +680,12 @@ private fun LiveScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        Color(0xFF100C16)
-                    )
+                    .background(Color(0xFF100C16))
                     .padding(12.dp),
-                horizontalArrangement =
-                    Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
 
                 Button(
-                    modifier = Modifier.weight(1f),
                     onClick = {
                         showGifts = !showGifts
                     },
@@ -708,7 +697,6 @@ private fun LiveScreen(
                 }
 
                 OutlinedButton(
-                    modifier = Modifier.weight(1f),
                     onClick = {}
                 ) {
                     Text("MUSIC")
@@ -732,22 +720,19 @@ private fun GiftPanel(
     onGift: (Int) -> Unit
 ) {
 
-    val gifts =
-        listOf(
-            "Rose" to 5,
-            "Heart" to 20,
-            "Fire" to 50,
-            "Diamond" to 100,
-            "Wave Crown" to 250,
-            "Royal Crown" to 500
-        )
+    val gifts = listOf(
+        "Rose" to 5,
+        "Heart" to 20,
+        "Fire" to 50,
+        "Diamond" to 100,
+        "Wave Crown" to 250,
+        "Royal Crown" to 500
+    )
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                Color(0xFF17121F)
-            )
+            .background(Color(0xFF17121F))
             .padding(12.dp)
     ) {
 
@@ -768,14 +753,16 @@ private fun GiftPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 5.dp),
-                verticalAlignment =
-                    Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically
             ) {
 
                 Text(
                     text = gift.first,
-                    color = Color.White,
-                    modifier = Modifier.weight(1f)
+                    color = Color.White
+                )
+
+                Spacer(
+                    modifier = Modifier.width(10.dp)
                 )
 
                 Text(
@@ -785,7 +772,7 @@ private fun GiftPanel(
                 )
 
                 Spacer(
-                    modifier = Modifier.width(8.dp)
+                    modifier = Modifier.width(10.dp)
                 )
 
                 Button(
@@ -810,29 +797,24 @@ private fun CreateScreen(
     onRequireLogin: () -> Unit
 ) {
 
-    var mode by remember {
-        mutableStateOf("video")
-    }
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement =
-            Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
 
         item {
 
             Text(
-                "Create",
+                text = "Create",
                 color = WaveText,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold
             )
 
             Text(
-                "Create videos or start your live",
+                text = "Create videos or start your live",
                 color = WaveMuted
             )
         }
@@ -852,14 +834,14 @@ private fun CreateScreen(
                 ) {
 
                     Text(
-                        "Video",
+                        text = "Video",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     Text(
-                        "Music • Filters • Effects",
+                        text = "Music • Filters • Effects",
                         color = WaveMuted
                     )
 
@@ -870,7 +852,6 @@ private fun CreateScreen(
                     Button(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = {
-                            mode = "video"
                             onRequireLogin()
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -898,14 +879,14 @@ private fun CreateScreen(
                 ) {
 
                     Text(
-                        "Live",
+                        text = "Live",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     Text(
-                        "Start a real creator session",
+                        text = "Start a real creator session",
                         color = WaveMuted
                     )
 
@@ -916,7 +897,6 @@ private fun CreateScreen(
                     Button(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = {
-                            mode = "live"
                             onRequireLogin()
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -944,14 +924,14 @@ private fun CreateScreen(
                 ) {
 
                     Text(
-                        "Music Library",
+                        text = "Music Library",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     Text(
-                        "Choose music for your creation",
+                        text = "Choose music for your creation",
                         color = WaveMuted
                     )
 
@@ -960,7 +940,7 @@ private fun CreateScreen(
                     )
 
                     Text(
-                        "Free music sources can be connected through the Wave API.",
+                        text = "Free music sources can be connected through the Wave API.",
                         color = WaveMuted,
                         fontSize = 13.sp
                     )
@@ -980,8 +960,7 @@ private fun InboxScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(18.dp),
-        horizontalAlignment =
-            Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
         Spacer(
@@ -989,7 +968,7 @@ private fun InboxScreen(
         )
 
         Text(
-            "INBOX",
+            text = "INBOX",
             color = WaveText,
             fontSize = 28.sp,
             fontWeight = FontWeight.ExtraBold
@@ -1002,7 +981,7 @@ private fun InboxScreen(
         if (!loggedIn) {
 
             Text(
-                "Login to view your messages and notifications.",
+                text = "Login to view your messages and notifications.",
                 color = WaveMuted,
                 textAlign = TextAlign.Center
             )
@@ -1023,7 +1002,7 @@ private fun InboxScreen(
         } else {
 
             Text(
-                "Your messages and notifications will appear here.",
+                text = "Your messages and notifications will appear here.",
                 color = WaveMuted,
                 textAlign = TextAlign.Center
             )
@@ -1043,14 +1022,13 @@ private fun ProfileScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement =
-            Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
 
         item {
 
             Text(
-                "Profile",
+                text = "Profile",
                 color = WaveText,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold
@@ -1083,12 +1061,11 @@ private fun ProfileScreen(
                                     )
                                 )
                             ),
-                        contentAlignment =
-                            Alignment.Center
+                        contentAlignment = Alignment.Center
                     ) {
 
                         Text(
-                            "W",
+                            text = "W",
                             color = Color.White,
                             fontSize = 32.sp,
                             fontWeight = FontWeight.ExtraBold
@@ -1102,28 +1079,28 @@ private fun ProfileScreen(
                     if (loggedIn) {
 
                         Text(
-                            "Wave User",
+                            text = "Wave User",
                             color = WaveText,
                             fontSize = 21.sp,
                             fontWeight = FontWeight.Bold
                         )
 
                         Text(
-                            "Verified Wave account",
+                            text = "Verified Wave account",
                             color = WaveMuted
                         )
 
                     } else {
 
                         Text(
-                            "Guest Account",
+                            text = "Guest Account",
                             color = WaveText,
                             fontSize = 21.sp,
                             fontWeight = FontWeight.Bold
                         )
 
                         Text(
-                            "Login to create your real account.",
+                            text = "Login to create your real account.",
                             color = WaveMuted
                         )
                     }
@@ -1146,7 +1123,7 @@ private fun ProfileScreen(
                 ) {
 
                     Text(
-                        "Creator Wallet",
+                        text = "Creator Wallet",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
@@ -1157,7 +1134,7 @@ private fun ProfileScreen(
                     )
 
                     Text(
-                        "$coins Wave Coins",
+                        text = "$coins Wave Coins",
                         color = WaveGold,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
@@ -1182,10 +1159,11 @@ private fun ProfileScreen(
                     ) {
 
                         Text(
-                            if (loggedIn)
+                            text = if (loggedIn) {
                                 "ADD COINS"
-                            else
+                            } else {
                                 "LOGIN"
+                            }
                         )
                     }
                 }
@@ -1207,14 +1185,14 @@ private fun ProfileScreen(
                 ) {
 
                     Text(
-                        "Creator Earnings",
+                        text = "Creator Earnings",
                         color = Color.White,
                         fontSize = 19.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     Text(
-                        "Your creator earnings and withdrawals will be managed through the Wave backend.",
+                        text = "Your creator earnings and withdrawals will be managed through the Wave backend.",
                         color = WaveMuted,
                         fontSize = 13.sp
                     )
@@ -1238,13 +1216,19 @@ private fun LoginScreen(
         mutableStateOf("")
     }
 
+    /*
+     * مهم:
+     * LocalContext.current هنا داخل Composable فقط.
+     * لا يتم استدعاؤه داخل onClick كـ Composable invocation.
+     */
+    val context = LocalContext.current
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(WaveDark)
             .padding(20.dp),
-        horizontalAlignment =
-            Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
         Spacer(
@@ -1263,12 +1247,11 @@ private fun LoginScreen(
                         )
                     )
                 ),
-            contentAlignment =
-                Alignment.Center
+            contentAlignment = Alignment.Center
         ) {
 
             Text(
-                "W",
+                text = "W",
                 color = Color.White,
                 fontSize = 40.sp,
                 fontWeight = FontWeight.ExtraBold
@@ -1280,14 +1263,14 @@ private fun LoginScreen(
         )
 
         Text(
-            "Welcome to Wave",
+            text = "Welcome to Wave",
             color = WaveText,
             fontSize = 27.sp,
             fontWeight = FontWeight.ExtraBold
         )
 
         Text(
-            "Sign in to your Wave account",
+            text = "Sign in to your Wave account",
             color = WaveMuted
         )
 
@@ -1295,7 +1278,7 @@ private fun LoginScreen(
             modifier = Modifier.height(25.dp)
         )
 
-        androidx.compose.material3.OutlinedTextField(
+        OutlinedTextField(
             value = username,
             onValueChange = {
                 username = it
@@ -1311,7 +1294,7 @@ private fun LoginScreen(
             modifier = Modifier.height(12.dp)
         )
 
-        androidx.compose.material3.OutlinedTextField(
+        OutlinedTextField(
             value = password,
             onValueChange = {
                 password = it
@@ -1336,11 +1319,10 @@ private fun LoginScreen(
                     password.isNotBlank()
                 ) {
 
-                    val context =
-                        androidx.compose.ui.platform
-                            .LocalContext
-                            .current
-
+                    /*
+                     * context تم الحصول عليه مسبقًا من
+                     * LocalContext.current داخل Composable.
+                     */
                     context
                         .getSharedPreferences(
                             "vyro_session",
@@ -1349,7 +1331,7 @@ private fun LoginScreen(
                         .edit()
                         .putString(
                             "session",
-                            username
+                            username.trim()
                         )
                         .apply()
 
@@ -1370,8 +1352,9 @@ private fun LoginScreen(
         TextButton(
             onClick = onBack
         ) {
+
             Text(
-                "BACK",
+                text = "BACK",
                 color = WaveMuted
             )
         }
