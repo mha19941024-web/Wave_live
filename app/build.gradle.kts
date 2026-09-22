@@ -26,7 +26,7 @@ android {
         buildConfigField(
             "String",
             "API_BASE_URL",
-            "\"https://worker-jolly-band-100e.mha41024.workers.dev\""
+            "\"https://worker-jolly-band-100e.mha19941024.workers.dev\""
         )
     }
 
