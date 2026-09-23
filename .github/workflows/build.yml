@@ -1,128 +1,180 @@
 name: Build Wave
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
+workflow_dispatch:
+push:
+branches:
+- main
 
 permissions:
-  contents: read
+contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+build:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
-      - name: Check Java
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Check Java
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          echo "===== JAVA ====="
-          java -version
+      echo "===== JAVA ====="
+      java -version
 
-      - name: Check project files
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Check project files
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          echo "===== ROOT ====="
-          ls -la
+      echo "===== ROOT ====="
+      ls -la
 
-          echo ""
-          echo "===== REQUIRED FILES ====="
+      echo ""
+      echo "===== REQUIRED FILES ====="
 
-          required_files=(
-            "settings.gradle.kts"
-            "build.gradle.kts"
-            "gradle.properties"
-            "app/build.gradle.kts"
-            "app/src/main/AndroidManifest.xml"
-          )
+      required_files=(
+        "settings.gradle.kts"
+        "build.gradle.kts"
+        "gradle.properties"
+        "app/build.gradle.kts"
+        "app/src/main/AndroidManifest.xml"
+        "worker/package.json"
+        "worker/wrangler.toml"
+        "worker/src/index.ts"
+      )
 
-          missing=0
+      missing=0
 
-          for file in "${required_files[@]}"; do
-            if [ -f "$file" ]; then
-              echo "OK      $file"
-            else
-              echo "MISSING $file"
-              missing=1
-            fi
-          done
+      for file in "${required_files[@]}"; do
+        if [ -f "$file" ]; then
+          echo "OK      $file"
+        else
+          echo "MISSING $file"
+          missing=1
+        fi
+      done
 
-          if [ "$missing" -ne 0 ]; then
-            echo ""
-            echo "===== REQUIRED FILES ARE MISSING ====="
-            exit 1
-          fi
+      if [ "$missing" -ne 0 ]; then
+        echo ""
+        echo "===== REQUIRED FILES ARE MISSING ====="
+        exit 1
+      fi
 
-          echo ""
-          echo "===== ALL REQUIRED FILES EXIST ====="
+      echo ""
+      echo "===== ALL REQUIRED FILES EXIST ====="
 
-      - name: Install Gradle 8.9
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Install Gradle 8.9
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          GRADLE_VERSION="8.9"
-          GRADLE_DIR="$HOME/gradle"
+      GRADLE_VERSION="8.9"
+      GRADLE_DIR="$HOME/gradle"
 
-          echo "===== DOWNLOADING GRADLE ${GRADLE_VERSION} ====="
+      echo "===== DOWNLOADING GRADLE ${GRADLE_VERSION} ====="
 
-          mkdir -p "$GRADLE_DIR"
+      mkdir -p "$GRADLE_DIR"
 
-          curl -fL \
-            "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
-            -o "$GRADLE_DIR/gradle.zip"
+      curl -fL \
+        "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+        -o "$GRADLE_DIR/gradle.zip"
 
-          unzip -q -o \
-            "$GRADLE_DIR/gradle.zip" \
-            -d "$GRADLE_DIR"
+      unzip -q -o \
+        "$GRADLE_DIR/gradle.zip" \
+        -d "$GRADLE_DIR"
 
-          echo "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+      echo "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
 
-          echo ""
-          echo "===== GRADLE VERSION ====="
+      echo ""
+      echo "===== GRADLE VERSION ====="
 
-          "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin/gradle" --version
+      "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin/gradle" --version
 
-      - name: Build Debug APK
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Build Debug APK
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          echo "===== BUILDING WAVE LIVE APK ====="
+      echo "===== BUILDING WAVE LIVE APK ====="
 
-          gradle :app:assembleDebug --stacktrace
+      gradle :app:assembleDebug --stacktrace
 
-      - name: Verify APK
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Verify APK
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          APK="app/build/outputs/apk/debug/app-debug.apk"
+      APK="app/build/outputs/apk/debug/app-debug.apk"
 
-          echo "===== CHECKING APK ====="
+      echo "===== CHECKING APK ====="
 
-          if [ ! -f "$APK" ]; then
-            echo "APK NOT FOUND:"
-            echo "$APK"
-            exit 1
-          fi
+      if [ ! -f "$APK" ]; then
+        echo "APK NOT FOUND:"
+        echo "$APK"
+        exit 1
+      fi
 
-          echo ""
-          echo "===== APK CREATED SUCCESSFULLY ====="
-          ls -lh "$APK"
+      echo ""
+      echo "===== APK CREATED SUCCESSFULLY ====="
+      ls -lh "$APK"
 
-      - name: Upload APK
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: Wave-Live-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
+  - name: Upload APK
+    uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    with:
+      name: Wave-Live-debug-apk
+      path: app/build/outputs/apk/debug/app-debug.apk
+      if-no-files-found: error
+      retention-days: 14
+
+  - name: Setup Node.js
+    uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+    with:
+      node-version: 20
+      cache: npm
+      cache-dependency-path: worker/package.json
+
+  - name: Install Worker dependencies
+    working-directory: worker
+    shell: bash
+    run: |
+      set -euo pipefail
+
+      echo "===== INSTALLING WORKER DEPENDENCIES ====="
+
+      npm install
+
+  - name: Verify Cloudflare authentication
+    working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    shell: bash
+    run: |
+      set -euo pipefail
+
+      if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+        echo "ERROR: CLOUDFLARE_API_TOKEN GitHub Secret is missing."
+        exit 1
+      fi
+
+      echo "===== CLOUDFLARE AUTHENTICATION CHECK ====="
+
+      npx wrangler whoami
+
+  - name: Deploy Cloudflare Worker
+    working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    shell: bash
+    run: |
+      set -euo pipefail
+
+      echo "===== DEPLOYING WAVE LIVE WORKER ====="
+
+      npx wrangler deploy
+
+      echo ""
+      echo "===== CLOUDFLARE WORKER DEPLOYED ====="
