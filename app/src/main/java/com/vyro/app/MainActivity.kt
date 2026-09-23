@@ -1,2692 +1,2463 @@
 package com.vyro.app
 
-import android.net.Uri
-import android.os.Bundle
-import android.view.ViewGroup
-import android.widget.VideoView
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.weight
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import kotlinx.coroutines.launch
-
-private val WaveBackground = Color(0xFF08060D)
-private val WaveSurface = Color(0xFF15111D)
-private val WavePurple = Color(0xFF9B5CFF)
-private val WavePink = Color(0xFFFF4FA3)
-private val WaveGold = Color(0xFFFFC857)
-private val WaveGreen = Color(0xFF22C55E)
-private val WaveWhite = Color(0xFFF8F5FF)
-private val WaveMuted = Color(0xFFA9A1B5)
-private val WaveRed = Color(0xFFFF5C67)
-
-private enum class WaveTab {
-    HOME,
-    LIVE,
-    CREATE,
-    INBOX,
-    PROFILE
-}
-
-class MainActivity : ComponentActivity() {
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        setContent {
-            MaterialTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = WaveBackground
-                ) {
-                    WaveApp()
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun WaveApp() {
-
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var selectedTab by remember {
-        mutableStateOf(WaveTab.HOME)
-    }
-
-    var loggedIn by remember {
-        mutableStateOf(WaveApi.isLoggedIn(context))
-    }
-
-    var currentUser by remember {
-        mutableStateOf<WaveApi.User?>(null)
-    }
-
-    var coins by remember {
-        mutableIntStateOf(0)
-    }
-
-    var showAuth by remember {
-        mutableStateOf(!loggedIn)
-    }
-
-    LaunchedEffect(loggedIn) {
-
-        if (loggedIn) {
-
-            val result = WaveApi.me(context)
-
-            if (result.isSuccess) {
-
-                currentUser = result.getOrNull()
-                coins = result.getOrNull()?.coins ?: 0
-                showAuth = false
-
-            } else {
-
-                loggedIn = false
-                currentUser = null
-                coins = 0
-                showAuth = true
-            }
-        }
-    }
-
-    if (showAuth && !loggedIn) {
-
-        AuthScreen(
-            onLoginSuccess = { user ->
-
-                loggedIn = true
-                currentUser = user
-                coins = user?.coins ?: 0
-                showAuth = false
-            }
-        )
-
-        return
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(WaveBackground)
-    ) {
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        ) {
-
-            when (selectedTab) {
-
-                WaveTab.HOME -> {
-
-                    HomeScreen(
-                        coins = coins,
-                        onOpenLogin = {
-                            showAuth = true
-                        }
-                    )
-                }
-
-                WaveTab.LIVE -> {
-
-                    LiveRoomsScreen(
-                        onRequireLogin = {
-                            showAuth = true
-                        },
-                        onCoinsChanged = {
-                            coins = it
-                        }
-                    )
-                }
-
-                WaveTab.CREATE -> {
-
-                    CreateScreen(
-                        loggedIn = loggedIn,
-                        onRequireLogin = {
-                            showAuth = true
-                        }
-                    )
-                }
-
-                WaveTab.INBOX -> {
-                    InboxScreen()
-                }
-
-                WaveTab.PROFILE -> {
-
-                    ProfileScreen(
-                        user = currentUser,
-                        coins = coins,
-                        onLogout = {
-
-                            scope.launch {
-
-                                WaveApi.logout(context)
-
-                                loggedIn = false
-                                currentUser = null
-                                coins = 0
-                                showAuth = true
-                            }
-                        },
-                        onCoinsChanged = {
-                            coins = it
-                        }
-                    )
-                }
-            }
-        }
-
-        WaveBottomBar(
-            selected = selectedTab,
-            onSelected = {
-                selectedTab = it
-            }
-        )
-    }
-}
-
-/* ========================================================= */
-/* HOME */
-/* ========================================================= */
-
-@Composable
-private fun HomeScreen(
-    coins: Int,
-    onOpenLogin: () -> Unit
-) {
-
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var videos by remember {
-        mutableStateOf<List<WaveApi.Video>>(emptyList())
-    }
-
-    var loading by remember {
-        mutableStateOf(true)
-    }
-
-    var error by remember {
-        mutableStateOf("")
-    }
-
-    LaunchedEffect(Unit) {
-
-        loading = true
-
-        val result = WaveApi.feed(
-            context = context,
-            limit = 30,
-            cursor = 0
-        )
-
-        if (result.isSuccess) {
-
-            videos = result.getOrNull().orEmpty()
-            error = ""
-
-        } else {
-
-            error =
-                result.exceptionOrNull()?.message
-                    ?: "تعذر تحميل الفيديوهات"
-        }
-
-        loading = false
-    }
-
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-
-                Text(
-                    text = "WAVE",
-                    color = WaveWhite,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-
-                Text(
-                    text = "Live • Video • Music",
-                    color = WaveMuted,
-                    fontSize = 12.sp
-                )
-            }
-
-            CoinBadge(coins)
-        }
-
-        when {
-
-            loading -> {
-
-                CenterMessage(
-                    "جارِ التحميل",
-                    "نتصل بخادم Wave..."
-                )
-            }
-
-            error.isNotBlank() -> {
-
-                CenterMessage(
-                    "تعذر تحميل المحتوى",
-                    error
-                )
-            }
-
-            videos.isEmpty() -> {
-
-                CenterMessage(
-                    "لا توجد فيديوهات",
-                    "ابدأ بنشر أول فيديو على Wave."
-                )
-            }
-
-            else -> {
-
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-
-                    items(
-                        items = videos,
-                        key = { it.id }
-                    ) { video ->
-
-                        VideoCard(
-                            video = video,
-                            onLike = {
-
-                                if (!WaveApi.isLoggedIn(context)) {
-
-                                    onOpenLogin()
-
-                                } else {
-
-                                    scope.launch {
-                                        WaveApi.likeVideo(
-                                            context,
-                                            video.id
-                                        )
-                                    }
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun VideoCard(
-    video: WaveApi.Video,
-    onLike: () -> Unit
-) {
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                horizontal = 10.dp,
-                vertical = 7.dp
-            ),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = WaveSurface
-        )
-    ) {
-
-        Column {
-
-            if (video.videoUrl.isNotBlank()) {
-
-                AndroidView(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(430.dp)
-                        .clip(
-                            RoundedCornerShape(
-                                topStart = 18.dp,
-                                topEnd = 18.dp
-                            )
-                        ),
-                    factory = { ctx ->
-
-                        VideoView(ctx).apply {
-
-                            layoutParams =
-                                ViewGroup.LayoutParams(
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                    ViewGroup.LayoutParams.MATCH_PARENT
-                                )
-
-                            setVideoURI(
-                                Uri.parse(video.videoUrl)
-                            )
-
-                            setOnPreparedListener {
-                                it.isLooping = true
-                                it.start()
-                            }
-                        }
-                    }
-                )
-
-            } else {
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(430.dp)
-                        .background(Color.Black),
-                    contentAlignment = Alignment.Center
-                ) {
-
-                    Text(
-                        text = "VIDEO",
-                        color = WaveMuted,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Column(
-                modifier = Modifier.padding(14.dp)
-            ) {
-
-                Text(
-                    text = video.displayName.ifBlank {
-                        "@${video.username}"
-                    },
-                    color = WaveWhite,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                if (video.caption.isNotBlank()) {
-
-                    Spacer(
-                        modifier = Modifier.height(6.dp)
-                    )
-
-                    Text(
-                        text = video.caption,
-                        color = WaveWhite,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                if (!video.musicName.isNullOrBlank()) {
-
-                    Spacer(
-                        modifier = Modifier.height(6.dp)
-                    )
-
-                    Text(
-                        text = "♪ ${video.musicName}",
-                        color = WavePurple,
-                        fontSize = 13.sp
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement =
-                        Arrangement.SpaceBetween,
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
-
-                    TextButton(
-                        onClick = onLike
-                    ) {
-
-                        Text(
-                            text =
-                                if (video.liked) {
-                                    "♥ ${video.likes}"
-                                } else {
-                                    "♡ ${video.likes}"
-                                },
-                            color =
-                                if (video.liked) {
-                                    WavePink
-                                } else {
-                                    WaveWhite
-                                }
-                        )
-                    }
-
-                    Text(
-                        text = "💬 ${video.comments}",
-                        color = WaveMuted
-                    )
-
-                    Text(
-                        text = "↗ ${video.shares}",
-                        color = WaveMuted
-                    )
-
-                    Text(
-                        text = "${video.views} مشاهدة",
-                        color = WaveMuted,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        }
-    }
-}
-
-/* ========================================================= */
-/* LIVE */
-/* ========================================================= */
-
-@Composable
-private fun LiveRoomsScreen(
-    onRequireLogin: () -> Unit,
-    onCoinsChanged: (Int) -> Unit
-) {
-
-    val context = LocalContext.current
-
-    var lives by remember {
-        mutableStateOf<List<WaveApi.Live>>(emptyList())
-    }
-
-    var gifts by remember {
-        mutableStateOf<List<WaveApi.Gift>>(emptyList())
-    }
-
-    var selectedLive by remember {
-        mutableStateOf<WaveApi.Live?>(null)
-    }
-
-    var loading by remember {
-        mutableStateOf(true)
-    }
-
-    LaunchedEffect(Unit) {
-
-        val livesResult =
-            WaveApi.getLives(context)
-
-        if (livesResult.isSuccess) {
-            lives =
-                livesResult.getOrNull().orEmpty()
-        }
-
-        val giftsResult =
-            WaveApi.getGifts(context)
-
-        if (giftsResult.isSuccess) {
-            gifts =
-                giftsResult.getOrNull().orEmpty()
-        }
-
-        loading = false
-    }
-
-    if (selectedLive != null) {
-
-        LiveRoomScreen(
-            live = selectedLive!!,
-            gifts = gifts,
-            onBack = {
-                selectedLive = null
-            },
-            onCoinsChanged = onCoinsChanged,
-            onRequireLogin = onRequireLogin
-        )
-
-        return
-    }
-
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-
-        Text(
-            text = "البث المباشر",
-            color = WaveWhite,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.ExtraBold,
-            modifier = Modifier.padding(16.dp)
-        )
-
-        when {
-
-            loading -> {
-
-                CenterMessage(
-                    "جارِ التحميل",
-                    "نبحث عن البثوث الحالية..."
-                )
-            }
-
-            lives.isEmpty() -> {
-
-                CenterMessage(
-                    "لا يوجد بث مباشر الآن",
-                    "يمكنك بدء بث جديد من تبويب إنشاء."
-                )
-            }
-
-            else -> {
-
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-
-                    items(
-                        lives,
-                        key = { it.id }
-                    ) { live ->
-
-                        LiveRoomCard(
-                            live = live,
-                            onClick = {
-                                selectedLive = live
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LiveRoomCard(
-    live: WaveApi.Live,
-    onClick: () -> Unit
-) {
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                horizontal = 14.dp,
-                vertical = 7.dp
-            )
-            .clickable {
-                onClick()
-            },
-        colors = CardDefaults.cardColors(
-            containerColor = WaveSurface
-        ),
-        shape = RoundedCornerShape(18.dp)
-    ) {
-
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-
-            Row(
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
-                AvatarCircle(live.displayName)
-
-                Spacer(
-                    modifier = Modifier.width(12.dp)
-                )
-
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-
-                    Text(
-                        text = live.displayName,
-                        color = WaveWhite,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Text(
-                        text = "@${live.username}",
-                        color = WaveMuted,
-                        fontSize = 12.sp
-                    )
-                }
-
-                Text(
-                    text = "LIVE",
-                    color = WaveWhite,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .background(
-                            WaveRed,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .padding(
-                            horizontal = 9.dp,
-                            vertical = 5.dp
-                        )
-                )
-            }
-
-            Spacer(
-                modifier = Modifier.height(12.dp)
-            )
-
-            Text(
-                text = live.title,
-                color = WaveWhite,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(
-                modifier = Modifier.height(6.dp)
-            )
-
-            Text(
-                text =
-                    "مشاهدون: ${live.viewerCount} • إعجابات: ${live.likes}",
-                color = WaveMuted,
-                fontSize = 13.sp
-            )
-        }
-    }
-}
-
-@Composable
-private fun LiveRoomScreen(
-    live: WaveApi.Live,
-    gifts: List<WaveApi.Gift>,
-    onBack: () -> Unit,
-    onCoinsChanged: (Int) -> Unit,
-    onRequireLogin: () -> Unit
-) {
-
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var currentLive by remember {
-        mutableStateOf(live)
-    }
-
-    var showGifts by remember {
-        mutableStateOf(false)
-    }
-
-    var message by remember {
-        mutableStateOf("")
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(WaveBackground)
-                .padding(10.dp),
-            verticalAlignment =
-                Alignment.CenterVertically
-        ) {
-
-            TextButton(
-                onClick = onBack
-            ) {
-
-                Text(
-                    text = "رجوع",
-                    color = WaveWhite
-                )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-
-                Text(
-                    text = currentLive.displayName,
-                    color = WaveWhite,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = currentLive.title,
-                    color = WaveMuted,
-                    fontSize = 12.sp
-                )
-            }
-
-            Text(
-                text = "${currentLive.viewerCount}",
-                color = WaveWhite
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(430.dp)
-                .background(Color.Black),
-            contentAlignment = Alignment.Center
-        ) {
-
-            val playback =
-                currentLive.playbackUrl
-                    ?: currentLive.streamUrl
-
-            if (!playback.isNullOrBlank()) {
-
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { ctx ->
-
-                        VideoView(ctx).apply {
-
-                            setVideoURI(
-                                Uri.parse(playback)
-                            )
-
-                            setOnPreparedListener {
-                                it.isLooping = true
-                                it.start()
-                            }
-                        }
-                    }
-                )
-
-            } else {
-
-                Text(
-                    text = "LIVE",
-                    color = WaveRed,
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(WaveBackground)
-                .padding(12.dp)
-        ) {
-
-            Text(
-                text =
-                    "مشاهدون ${currentLive.viewerCount} • إعجابات ${currentLive.likes}",
-                color = WaveMuted,
-                fontSize = 13.sp
-            )
-
-            Spacer(
-                modifier = Modifier.height(12.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-
-                Button(
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-
-                        if (!WaveApi.isLoggedIn(context)) {
-
-                            onRequireLogin()
-
-                        } else {
-
-                            scope.launch {
-
-                                val result =
-                                    WaveApi.getLive(
-                                        context,
-                                        currentLive.id
-                                    )
-
-                                if (result.isSuccess) {
-
-                                    currentLive =
-                                        result.getOrNull()
-                                            ?: currentLive
-                                }
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = WavePurple
-                    )
-                ) {
-
-                    Text("تحديث")
-                }
-
-                Spacer(
-                    modifier = Modifier.width(8.dp)
-                )
-
-                Button(
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-
-                        if (!WaveApi.isLoggedIn(context)) {
-                            onRequireLogin()
-                        } else {
-                            showGifts = true
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = WavePink
-                    )
-                ) {
-
-                    Text("الهدايا")
-                }
-            }
-
-            if (message.isNotBlank()) {
-
-                Spacer(
-                    modifier = Modifier.height(10.dp)
-                )
-
-                Text(
-                    text = message,
-                    color = WaveGreen
-                )
-            }
-        }
-    }
-
-    if (showGifts) {
-
-        GiftSheet(
-            gifts = gifts,
-            onClose = {
-                showGifts = false
-            },
-            onSend = { gift ->
-
-                scope.launch {
-
-                    val result =
-                        WaveApi.sendGift(
-                            context = context,
-                            liveId = currentLive.id,
-                            giftId = gift.id
-                        )
-
-                    if (result.isSuccess) {
-
-                        onCoinsChanged(
-                            result.getOrNull()
-                                ?.remainingCoins
-                                ?: 0
-                        )
-
-                        message =
-                            "تم إرسال ${gift.name}"
-
-                    } else {
-
-                        message =
-                            result.exceptionOrNull()
-                                ?.message
-                                ?: "تعذر إرسال الهدية"
-                    }
-
-                    showGifts = false
-                }
-            }
-        )
-    }
-}
-
-/* ========================================================= */
-/* GIFTS */
-/* ========================================================= */
-
-@Composable
-private fun GiftSheet(
-    gifts: List<WaveApi.Gift>,
-    onClose: () -> Unit,
-    onSend: (WaveApi.Gift) -> Unit
-) {
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = WaveBackground
-    ) {
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
-                Text(
-                    text = "هدايا Wave",
-                    color = WaveWhite,
-                    fontSize = 23.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-
-                TextButton(
-                    onClick = onClose
-                ) {
-
-                    Text(
-                        text = "إغلاق",
-                        color = WaveWhite
-                    )
-                }
-            }
-
-            if (gifts.isEmpty()) {
-
-                CenterMessage(
-                    "لا توجد هدايا",
-                    "سيتم تحميل الهدايا من الخادم."
-                )
-
-            } else {
-
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-
-                    items(
-                        gifts,
-                        key = { it.id }
-                    ) { gift ->
-
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 5.dp)
-                                .clickable {
-                                    onSend(gift)
-                                },
-                            colors = CardDefaults.cardColors(
-                                containerColor = WaveSurface
-                            ),
-                            shape =
-                                RoundedCornerShape(16.dp)
-                        ) {
-
-                            Row(
-                                modifier =
-                                    Modifier.padding(15.dp),
-                                verticalAlignment =
-                                    Alignment.CenterVertically
-                            ) {
-
-                                Text(
-                                    text = gift.icon,
-                                    fontSize = 30.sp,
-                                    modifier =
-                                        Modifier.size(48.dp)
-                                )
-
-                                Column(
-                                    modifier =
-                                        Modifier.weight(1f)
-                                ) {
-
-                                    Text(
-                                        text = gift.name,
-                                        color = WaveWhite,
-                                        fontWeight =
-                                            FontWeight.Bold
-                                    )
-
-                                    Text(
-                                        text =
-                                            "${gift.price} Coin",
-                                        color = WaveGold,
-                                        fontSize = 13.sp
-                                    )
-                                }
-
-                                Text(
-                                    text = "إرسال",
-                                    color = WavePink,
-                                    fontWeight =
-                                        FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/* ========================================================= */
-/* CREATE */
-/* ========================================================= */
-
-@Composable
-private fun CreateScreen(
-    loggedIn: Boolean,
-    onRequireLogin: () -> Unit
-) {
-
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var title by remember {
-        mutableStateOf("")
-    }
-
-    var createdLive by remember {
-        mutableStateOf<WaveApi.Live?>(null)
-    }
-
-    var music by remember {
-        mutableStateOf<List<WaveApi.MusicTrack>>(emptyList())
-    }
-
-    var effects by remember {
-        mutableStateOf<List<WaveApi.VisualEffect>>(emptyList())
-    }
-
-    var message by remember {
-        mutableStateOf("")
-    }
-
-    LaunchedEffect(Unit) {
-
-        val musicResult =
-            WaveApi.getMusic(context)
-
-        if (musicResult.isSuccess) {
-            music =
-                musicResult.getOrNull().orEmpty()
-        }
-
-        val effectsResult =
-            WaveApi.getEffects(context)
-
-        if (effectsResult.isSuccess) {
-            effects =
-                effectsResult.getOrNull().orEmpty()
-        }
-    }
-
-    if (createdLive != null) {
-
-        CreatedLiveScreen(
-            live = createdLive!!,
-            onFinish = {
-
-                scope.launch {
-
-                    WaveApi.updateLive(
-                        context = context,
-                        liveId = createdLive!!.id,
-                        status = "ended"
-                    )
-
-                    createdLive = null
-                }
-            }
-        )
-
-        return
-    }
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-
-        item {
-
-            Text(
-                text = "إنشاء",
-                color = WaveWhite,
-                fontSize = 27.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-
-            Spacer(
-                modifier = Modifier.height(5.dp)
-            )
-
-            Text(
-                text =
-                    "ابدأ بث مباشر واستخدم الموسيقى والمؤثرات المتاحة.",
-                color = WaveMuted,
-                fontSize = 13.sp
-            )
-
-            Spacer(
-                modifier = Modifier.height(20.dp)
-            )
-
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = title,
-                onValueChange = {
-                    title = it
-                },
-                label = {
-                    Text("عنوان البث")
-                },
-                singleLine = true
-            )
-
-            Spacer(
-                modifier = Modifier.height(12.dp)
-            )
-
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-
-                    if (!loggedIn) {
-
-                        onRequireLogin()
-                        return@Button
-                    }
-
-                    if (title.isBlank()) {
-
-                        message =
-                            "اكتب عنوان البث أولاً"
-                        return@Button
-                    }
-
-                    scope.launch {
-
-                        message =
-                            "جارِ إنشاء البث..."
-
-                        val result =
-                            WaveApi.createLive(
-                                context = context,
-                                title = title.trim()
-                            )
-
-                        if (result.isSuccess) {
-
-                            createdLive =
-                                result.getOrNull()
-
-                            message = ""
-
-                        } else {
-
-                            message =
-                                result.exceptionOrNull()
-                                    ?.message
-                                    ?: "تعذر إنشاء البث"
-                        }
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = WavePurple
-                )
-            ) {
-
-                Text("بدء بث مباشر")
-            }
-
-            if (message.isNotBlank()) {
-
-                Spacer(
-                    modifier = Modifier.height(10.dp)
-                )
-
-                Text(
-                    text = message,
-                    color = WaveRed
-                )
-            }
-
-            Spacer(
-                modifier = Modifier.height(24.dp)
-            )
-
-            SectionTitle("مكتبة الموسيقى")
-
-            if (music.isEmpty()) {
-
-                Text(
-                    text =
-                        "لا توجد موسيقى منشورة حاليًا.",
-                    color = WaveMuted
-                )
-
-            } else {
-
-                music.take(20).forEach {
-                    MusicRow(it)
-                }
-            }
-
-            Spacer(
-                modifier = Modifier.height(20.dp)
-            )
-
-            SectionTitle("المؤثرات البصرية")
-
-            if (effects.isEmpty()) {
-
-                Text(
-                    text =
-                        "لا توجد مؤثرات منشورة حاليًا.",
-                    color = WaveMuted
-                )
-
-            } else {
-
-                effects.forEach {
-                    EffectRow(it)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CreatedLiveScreen(
-    live: WaveApi.Live,
-    onFinish: () -> Unit
-) {
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .padding(20.dp),
-        horizontalAlignment =
-            Alignment.CenterHorizontally
-    ) {
-
-        Spacer(
-            modifier = Modifier.height(40.dp)
-        )
-
-        Text(
-            text = "WAVE LIVE",
-            color = WaveWhite,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.ExtraBold
-        )
-
-        Spacer(
-            modifier = Modifier.height(20.dp)
-        )
-
-        Text(
-            text = live.title,
-            color = WaveWhite,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(
-            modifier = Modifier.height(15.dp)
-        )
-
-        Text(
-            text = "حالة البث: ${live.status}",
-            color = WaveGreen
-        )
-
-        Spacer(
-            modifier = Modifier.height(25.dp)
-        )
-
-        if (!live.rtmpsUrl.isNullOrBlank()) {
-
-            InfoBox(
-                "RTMPS URL",
-                live.rtmpsUrl!!
-            )
-        }
-
-        Spacer(
-            modifier = Modifier.height(10.dp)
-        )
-
-        if (!live.streamKey.isNullOrBlank()) {
-
-            InfoBox(
-                "Stream Key",
-                live.streamKey!!
-            )
-        }
-
-        Spacer(
-            modifier = Modifier.height(30.dp)
-        )
-
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = onFinish,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = WaveRed
-            )
-        ) {
-
-            Text("إنهاء البث")
-        }
-    }
-}
-
-/* ========================================================= */
-/* MUSIC / EFFECTS */
-/* ========================================================= */
-
-@Composable
-private fun MusicRow(
-    track: WaveApi.MusicTrack
-) {
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = WaveSurface
-        )
-    ) {
-
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment =
-                Alignment.CenterVertically
-        ) {
-
-            Text(
-                text = "♪",
-                color = WavePurple,
-                fontSize = 28.sp
-            )
-
-            Spacer(
-                modifier = Modifier.width(12.dp)
-            )
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-
-                Text(
-                    text = track.title,
-                    color = WaveWhite,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = track.artist,
-                    color = WaveMuted,
-                    fontSize = 12.sp
-                )
-            }
-
-            Text(
-                text = "${track.durationSeconds}s",
-                color = WaveMuted,
-                fontSize = 11.sp
-            )
-        }
-    }
-}
-
-@Composable
-private fun EffectRow(
-    effect: WaveApi.VisualEffect
-) {
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = WaveSurface
-        )
-    ) {
-
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment =
-                Alignment.CenterVertically
-        ) {
-
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(WavePurple),
-                contentAlignment = Alignment.Center
-            ) {
-
-                Text(
-                    text = "FX",
-                    color = WaveWhite,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(
-                modifier = Modifier.width(12.dp)
-            )
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-
-                Text(
-                    text = effect.name,
-                    color = WaveWhite,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text =
-                        "${effect.type} • ${effect.value}",
-                    color = WaveMuted,
-                    fontSize = 12.sp
-                )
-            }
-        }
-    }
-}
-
-/* ========================================================= */
-/* INBOX */
-/* ========================================================= */
-
-@Composable
-private fun InboxScreen() {
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(18.dp)
-    ) {
-
-        Text(
-            text = "Inbox",
-            color = WaveWhite,
-            fontSize = 27.sp,
-            fontWeight = FontWeight.ExtraBold
-        )
-
-        Spacer(
-            modifier = Modifier.height(20.dp)
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = WaveSurface
-            ),
-            shape = RoundedCornerShape(18.dp)
-        ) {
-
-            Column(
-                modifier = Modifier.padding(18.dp)
-            ) {
-
-                Text(
-                    text = "الإشعارات",
-                    color = WaveWhite,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(
-                    modifier = Modifier.height(8.dp)
-                )
-
-                Text(
-                    text =
-                        "الإشعارات والهدايا والمتابعون ستظهر هنا.",
-                    color = WaveMuted,
-                    fontSize = 13.sp
-                )
-            }
-        }
-    }
-}
-
-/* ========================================================= */
-/* PROFILE */
-/* ========================================================= */
-
-@Composable
-private fun ProfileScreen(
-    user: WaveApi.User?,
-    coins: Int,
-    onLogout: () -> Unit,
-    onCoinsChanged: (Int) -> Unit
-) {
-
-    if (user == null) {
-
-        CenterMessage(
-            "الحساب",
-            "سجل الدخول للوصول إلى حسابك."
-        )
-
-        return
-    }
-
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var wallet by remember {
-        mutableStateOf<WaveApi.Wallet?>(null)
-    }
-
-    var deposits by remember {
-        mutableStateOf<List<WaveApi.Deposit>>(emptyList())
-    }
-
-    var showWallet by remember {
-        mutableStateOf(false)
-    }
-
-    LaunchedEffect(showWallet) {
-
-        if (showWallet) {
-
-            val walletResult =
-                WaveApi.getWallet(context)
-
-            if (walletResult.isSuccess) {
-
-                wallet =
-                    walletResult.getOrNull()
-
-                onCoinsChanged(
-                    wallet?.coins ?: coins
-                )
-            }
-
-            val depositsResult =
-                WaveApi.getWalletDeposits(context)
-
-            if (depositsResult.isSuccess) {
-
-                deposits =
-                    depositsResult.getOrNull()
-                        .orEmpty()
-            }
-        }
-    }
-
-    if (showWallet) {
-
-        WalletScreen(
-            wallet = wallet,
-            deposits = deposits,
-            onBack = {
-                showWallet = false
-            },
-            onDeposit = { amount, number, reference ->
-
-                scope.launch {
-
-                    val result =
-                        WaveApi.createWalletDeposit(
-                            context = context,
-                            amount = amount,
-                            walletNumber = number,
-                            transactionReference =
-                                reference
-                        )
-
-                    if (result.isSuccess) {
-
-                        val refresh =
-                            WaveApi.getWallet(context)
-
-                        if (refresh.isSuccess) {
-
-                            val data =
-                                refresh.getOrNull()
-
-                            wallet = data
-
-                            onCoinsChanged(
-                                data?.coins ?: coins
-                            )
-                        }
-                    }
-                }
-            }
-        )
-
-        return
-    }
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-
-        item {
-
-            AvatarCircle(
-                user.displayName,
-                82.dp
-            )
-
-            Spacer(
-                modifier = Modifier.height(12.dp)
-            )
-
-            Text(
-                text = user.displayName,
-                color = WaveWhite,
-                fontSize = 25.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-
-            Text(
-                text = "@${user.username}",
-                color = WaveMuted
-            )
-
-            if (!user.bio.isNullOrBlank()) {
-
-                Spacer(
-                    modifier = Modifier.height(8.dp)
-                )
-
-                Text(
-                    text = user.bio!!,
-                    color = WaveWhite
-                )
-            }
-
-            Spacer(
-                modifier = Modifier.height(20.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement =
-                    Arrangement.SpaceEvenly
-            ) {
-
-                StatBox(
-                    user.followers,
-                    "المتابعون"
-                )
-
-                StatBox(
-                    user.following,
-                    "يتابع"
-                )
-
-                StatBox(
-                    coins,
-                    "Coins"
-                )
-            }
-
-            Spacer(
-                modifier = Modifier.height(20.dp)
-            )
-
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    showWallet = true
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = WavePurple
-                )
-            ) {
-
-                Text("محفظة Wave")
-            }
-
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
-
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onLogout
-            ) {
-
-                Text(
-                    text = "تسجيل الخروج",
-                    color = WaveWhite
-                )
-            }
-
-            Spacer(
-                modifier = Modifier.height(20.dp)
-            )
-
-            Text(
-                text =
-                    if (user.verified) {
-                        "✓ حساب موثق"
-                    } else {
-                        "حساب عادي"
-                    },
-                color =
-                    if (user.verified) {
-                        WaveGreen
-                    } else {
-                        WaveMuted
-                    }
-            )
-        }
-    }
-}
-
-/* ========================================================= */
-/* WALLET */
-/* ========================================================= */
-
-@Composable
-private fun WalletScreen(
-    wallet: WaveApi.Wallet?,
-    deposits: List<WaveApi.Deposit>,
-    onBack: () -> Unit,
-    onDeposit: (
-        Int,
-        String,
-        String
-    ) -> Unit
-) {
-
-    var amount by remember {
-        mutableStateOf("")
-    }
-
-    var walletNumber by remember {
-        mutableStateOf(
-            wallet?.walletNumbers
-                ?.firstOrNull()
-                ?: ""
-        )
-    }
-
-    var reference by remember {
-        mutableStateOf("")
-    }
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-
-        item {
-
-            TextButton(
-                onClick = onBack
-            ) {
-
-                Text(
-                    "رجوع",
-                    color = WaveWhite
-                )
-            }
-
-            Text(
-                text = "محفظة Wave",
-                color = WaveWhite,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-
-            Spacer(
-                modifier = Modifier.height(15.dp)
-            )
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = WaveSurface
-                )
-            ) {
-
-                Column(
-                    modifier = Modifier.padding(20.dp)
-                ) {
-
-                    Text(
-                        "الرصيد",
-                        color = WaveMuted
-                    )
-
-                    Text(
-                        "${wallet?.coins ?: 0} Coins",
-                        color = WaveGold,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-            }
-
-            Spacer(
-                modifier = Modifier.height(20.dp)
-            )
-
-            SectionTitle("إضافة رصيد")
-
-            Text(
-                text =
-                    "الدفع المتاح حاليًا عبر المحفظة فقط.",
-                color = WaveMuted,
-                fontSize = 12.sp
-            )
-
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
-
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = amount,
-                onValueChange = {
-                    amount =
-                        it.filter { c ->
-                            c.isDigit()
-                        }
-                },
-                label = {
-                    Text("المبلغ")
-                },
-                singleLine = true
-            )
-
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
-
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = walletNumber,
-                onValueChange = {
-                    walletNumber = it
-                },
-                label = {
-                    Text("رقم المحفظة")
-                },
-                singleLine = true
-            )
-
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
-
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = reference,
-                onValueChange = {
-                    reference = it
-                },
-                label = {
-                    Text("رقم العملية / المرجع")
-                },
-                singleLine = true
-            )
-
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
-
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-
-                    val value =
-                        amount.toIntOrNull()
-                            ?: return@Button
-
-                    if (
-                        value > 0 &&
-                        walletNumber.isNotBlank()
-                    ) {
-
-                        onDeposit(
-                            value,
-                            walletNumber,
-                            reference
-                        )
-
-                        amount = ""
-                        reference = ""
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = WavePurple
-                )
-            ) {
-
-                Text("إرسال طلب الإيداع")
-            }
-
-            Spacer(
-                modifier = Modifier.height(25.dp)
-            )
-
-            SectionTitle("طلبات الإيداع")
-
-            if (deposits.isEmpty()) {
-
-                Text(
-                    "لا توجد عمليات سابقة.",
-                    color = WaveMuted
-                )
-
-            } else {
-
-                deposits.take(20).forEach {
-                    DepositRow(it)
-                }
-            }
-        }
-    }
-}
-
-/* ========================================================= */
-/* AUTH */
-/* ========================================================= */
-
-@Composable
-private fun AuthScreen(
-    onLoginSuccess: (WaveApi.User?) -> Unit
-) {
-
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var registerMode by remember {
-        mutableStateOf(false)
-    }
-
-    var username by remember {
-        mutableStateOf("")
-    }
-
-    var password by remember {
-        mutableStateOf("")
-    }
-
-    var displayName by remember {
-        mutableStateOf("")
-    }
-
-    var loading by remember {
-        mutableStateOf(false)
-    }
-
-    var error by remember {
-        mutableStateOf("")
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(WaveBackground)
-            .padding(22.dp),
-        horizontalAlignment =
-            Alignment.CenterHorizontally
-    ) {
-
-        Spacer(
-            modifier = Modifier.height(45.dp)
-        )
-
-        Text(
-            text = "WAVE",
-            color = WaveWhite,
-            fontSize = 42.sp,
-            fontWeight = FontWeight.ExtraBold
-        )
-
-        Text(
-            text = "LIVE",
-            color = WavePurple,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(
-            modifier = Modifier.height(35.dp)
-        )
-
-        Text(
-            text =
-                if (registerMode) {
-                    "إنشاء حساب حقيقي"
-                } else {
-                    "تسجيل الدخول"
-                },
-            color = WaveWhite,
-            fontSize = 23.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(
-            modifier = Modifier.height(20.dp)
-        )
-
-        if (registerMode) {
-
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = displayName,
-                onValueChange = {
-                    displayName = it
-                },
-                label = {
-                    Text("الاسم")
-                },
-                singleLine = true
-            )
-
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
-        }
-
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = username,
-            onValueChange = {
-                username = it
-            },
-            label = {
-                Text("Username")
-            },
-            singleLine = true
-        )
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = password,
-            onValueChange = {
-                password = it
-            },
-            label = {
-                Text("Password")
-            },
-            singleLine = true
-        )
-
-        Spacer(
-            modifier = Modifier.height(15.dp)
-        )
-
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !loading,
-            onClick = {
-
-                if (
-                    username.isBlank() ||
-                    password.isBlank()
-                ) {
-
-                    error =
-                        "أدخل اسم المستخدم وكلمة المرور"
-                    return@Button
-                }
-
-                if (
-                    registerMode &&
-                    displayName.isBlank()
-                ) {
-
-                    error =
-                        "أدخل الاسم"
-                    return@Button
-                }
-
-                scope.launch {
-
-                    loading = true
-                    error = ""
-
-                    val result =
-                        if (registerMode) {
-
-                            WaveApi.register(
-                                context = context,
-                                username = username.trim(),
-                                password = password,
-                                displayName =
-                                    displayName.trim()
-                            )
-
-                        } else {
-
-                            WaveApi.login(
-                                context = context,
-                                username = username.trim(),
-                                password = password
-                            )
-                        }
-
-                    if (result.isSuccess) {
-
-                        onLoginSuccess(
-                            result.getOrNull()?.user
-                        )
-
-                    } else {
-
-                        error =
-                            result.exceptionOrNull()
-                                ?.message
-                                ?: "حدث خطأ"
-                    }
-
-                    loading = false
-                }
-            },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = WavePurple
-            )
-        ) {
-
-            Text(
-                text =
-                    if (loading) {
-                        "جارِ الاتصال..."
-                    } else if (registerMode) {
-                        "إنشاء الحساب"
-                    } else {
-                        "دخول"
-                    }
-            )
-        }
-
-        if (error.isNotBlank()) {
-
-            Spacer(
-                modifier = Modifier.height(12.dp)
-            )
-
-            Text(
-                text = error,
-                color = WaveRed,
-                fontSize = 13.sp
-            )
-        }
-
-        Spacer(
-            modifier = Modifier.height(15.dp)
-        )
-
-        TextButton(
-            onClick = {
-
-                registerMode = !registerMode
-                error = ""
-            }
-        ) {
-
-            Text(
-                text =
-                    if (registerMode) {
-                        "لدي حساب بالفعل"
-                    } else {
-                        "إنشاء حساب جديد"
-                    },
-                color = WavePurple
-            )
-        }
-    }
-}
-
-/* ========================================================= */
-/* BOTTOM NAVIGATION */
-/* ========================================================= */
-
-@Composable
-private fun WaveBottomBar(
-    selected: WaveTab,
-    onSelected: (WaveTab) -> Unit
-) {
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(WaveSurface)
-            .padding(
-                horizontal = 4.dp,
-                vertical = 7.dp
-            ),
-        horizontalArrangement =
-            Arrangement.SpaceEvenly
-    ) {
-
-        BottomItem(
-            "الرئيسية",
-            "H",
-            selected == WaveTab.HOME
-        ) {
-            onSelected(WaveTab.HOME)
-        }
-
-        BottomItem(
-            "LIVE",
-            "L",
-            selected == WaveTab.LIVE
-        ) {
-            onSelected(WaveTab.LIVE)
-        }
-
-        BottomItem(
-            "إنشاء",
-            "+",
-            selected == WaveTab.CREATE
-        ) {
-            onSelected(WaveTab.CREATE)
-        }
-
-        BottomItem(
-            "Inbox",
-            "M",
-            selected == WaveTab.INBOX
-        ) {
-            onSelected(WaveTab.INBOX)
-        }
-
-        BottomItem(
-            "حسابي",
-            "P",
-            selected == WaveTab.PROFILE
-        ) {
-            onSelected(WaveTab.PROFILE)
-        }
-    }
-}
-
-@Composable
-private fun BottomItem(
-    text: String,
-    short: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-
-    Column(
-        modifier = Modifier
-            .clickable {
-                onClick()
-            }
-            .padding(
-                horizontal = 7.dp,
-                vertical = 4.dp
-            ),
-        horizontalAlignment =
-            Alignment.CenterHorizontally
-    ) {
-
-        Text(
-            text = short,
-            color =
-                if (selected) {
-                    WavePurple
-                } else {
-                    WaveMuted
-                },
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = text,
-            color =
-                if (selected) {
-                    WaveWhite
-                } else {
-                    WaveMuted
-                },
-            fontSize = 10.sp
-        )
-    }
-}
-
-/* ========================================================= */
-/* UI HELPERS */
-/* ========================================================= */
-
-@Composable
-private fun CoinBadge(
-    coins: Int
-) {
-
-    Row(
-        modifier = Modifier
-            .background(
-                WaveSurface,
-                RoundedCornerShape(12.dp)
-            )
-            .padding(
-                horizontal = 10.dp,
-                vertical = 7.dp
-            ),
-        verticalAlignment =
-            Alignment.CenterVertically
-    ) {
-
-        Text(
-            text = "●",
-            color = WaveGold,
-            fontSize = 12.sp
-        )
-
-        Spacer(
-            modifier = Modifier.width(5.dp)
-        )
-
-        Text(
-            text = coins.toString(),
-            color = WaveWhite,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
-private fun AvatarCircle(
-    name: String,
-    size: androidx.compose.ui.unit.Dp = 52.dp
-) {
-
-    val letter =
-        name.trim()
-            .firstOrNull()
-            ?.uppercase()
-            ?.toString()
-            ?: "W"
-
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(WavePurple),
-        contentAlignment = Alignment.Center
-    ) {
-
-        Text(
-            text = letter,
-            color = WaveWhite,
-            fontSize =
-                if (size > 60.dp) {
-                    25.sp
-                } else {
-                    17.sp
-                },
-            fontWeight = FontWeight.ExtraBold
-        )
-    }
-}
-
-@Composable
-private fun CenterMessage(
-    title: String,
-    message: String
-) {
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(25.dp),
-        horizontalAlignment =
-            Alignment.CenterHorizontally,
-        verticalArrangement =
-            Arrangement.Center
-    ) {
-
-        Text(
-            text = title,
-            color = WaveWhite,
-            fontSize = 21.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        Text(
-            text = message,
-            color = WaveMuted,
-            fontSize = 13.sp
-        )
-    }
-}
-
-@Composable
-private fun SectionTitle(
-    title: String
-) {
-
-    Text(
-        text = title,
-        color = WaveWhite,
-        fontSize = 19.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(
-            vertical = 7.dp
-        )
+import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+
+object WaveApi {
+
+    private const val BASE_URL =
+        "https://worker-jolly-band-100e.mha19941024.workers.dev"
+
+    private const val PREFS_NAME = "vyro_session"
+    private const val TOKEN_KEY = "token"
+
+    data class ApiResult(
+        val success: Boolean,
+        val statusCode: Int,
+        val data: JSONObject?,
+        val error: String? = null
     )
-}
 
-@Composable
-private fun StatBox(
-    value: Int,
-    label: String
-) {
+    data class User(
+        val id: String,
+        val username: String,
+        val displayName: String,
+        val avatar: String?,
+        val bio: String?,
+        val coins: Int,
+        val followers: Int,
+        val following: Int,
+        val verified: Boolean
+    )
 
-    Column(
-        horizontalAlignment =
-            Alignment.CenterHorizontally
+    data class Session(
+        val token: String,
+        val user: User?,
+        val expiresAt: String?
+    )
+
+    data class Gift(
+        val id: String,
+        val name: String,
+        val price: Int,
+        val icon: String,
+        val imageUrl: String?,
+        val animationUrl: String?
+    )
+
+    data class GiftSendResult(
+        val transactionId: String?,
+        val remainingCoins: Int,
+        val giftId: String?,
+        val giftName: String?,
+        val quantity: Int,
+        val totalCoins: Int
+    )
+
+    data class MusicTrack(
+        val id: String,
+        val title: String,
+        val artist: String,
+        val audioUrl: String,
+        val coverUrl: String?,
+        val durationSeconds: Int
+    )
+
+    data class VisualEffect(
+        val id: String,
+        val name: String,
+        val type: String,
+        val value: String
+    )
+
+    data class Live(
+        val id: String,
+        val userId: String,
+        val username: String,
+        val displayName: String,
+        val avatar: String?,
+        val title: String,
+        val streamUrl: String?,
+        val playbackUrl: String?,
+        val rtmpsUrl: String?,
+        val streamKey: String?,
+        val viewerCount: Int,
+        val likes: Int,
+        val status: String,
+        val startedAt: String?
+    )
+
+    data class Video(
+        val id: String,
+        val userId: String,
+        val username: String,
+        val displayName: String,
+        val avatar: String?,
+        val videoUrl: String,
+        val thumbnailUrl: String?,
+        val caption: String,
+        val musicName: String?,
+        val likes: Int,
+        val comments: Int,
+        val shares: Int,
+        val views: Int,
+        val liked: Boolean,
+        val createdAt: String?
+    )
+
+    data class Wallet(
+        val coins: Int,
+        val walletNumbers: List<String>,
+        val paymentMethods: List<String>
+    )
+
+    data class Deposit(
+        val id: String,
+        val amount: Int,
+        val walletNumber: String,
+        val transactionReference: String?,
+        val coins: Int,
+        val status: String,
+        val createdAt: String?,
+        val updatedAt: String?
+    )
+
+    private fun prefs(context: Context) =
+        context.getSharedPreferences(
+            PREFS_NAME,
+            Context.MODE_PRIVATE
+        )
+
+    private fun saveToken(
+        context: Context,
+        token: String
     ) {
-
-        Text(
-            text = value.toString(),
-            color = WaveWhite,
-            fontSize = 19.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = label,
-            color = WaveMuted,
-            fontSize = 11.sp
-        )
+        prefs(context)
+            .edit()
+            .putString(TOKEN_KEY, token)
+            .apply()
     }
-}
 
-@Composable
-private fun InfoBox(
-    title: String,
-    value: String
-) {
+    fun getToken(
+        context: Context
+    ): String? {
+        return prefs(context)
+            .getString(
+                TOKEN_KEY,
+                null
+            )
+    }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = WaveSurface
-        )
+    fun isLoggedIn(
+        context: Context
+    ): Boolean {
+        return !getToken(context).isNullOrBlank()
+    }
+
+    fun clearSession(
+        context: Context
     ) {
+        prefs(context)
+            .edit()
+            .remove(TOKEN_KEY)
+            .apply()
+    }
 
-        Column(
-            modifier = Modifier.padding(14.dp)
-        ) {
+    private suspend fun request(
+        context: Context,
+        method: String,
+        path: String,
+        body: JSONObject? = null,
+        authenticated: Boolean = true
+    ): ApiResult = withContext(Dispatchers.IO) {
 
-            Text(
-                text = title,
-                color = WavePurple,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
+        var connection: HttpURLConnection? = null
+
+        try {
+            val url =
+                BASE_URL.trimEnd('/') +
+                    "/" +
+                    path.trimStart('/')
+
+            connection =
+                URL(url)
+                    .openConnection() as HttpURLConnection
+
+            connection.requestMethod = method
+            connection.connectTimeout = 15000
+            connection.readTimeout = 20000
+            connection.useCaches = false
+            connection.doInput = true
+
+            connection.setRequestProperty(
+                "Accept",
+                "application/json"
             )
 
-            Spacer(
-                modifier = Modifier.height(4.dp)
+            connection.setRequestProperty(
+                "Content-Type",
+                "application/json; charset=utf-8"
             )
 
-            Text(
-                text = value,
-                color = WaveWhite,
-                fontSize = 12.sp
+            connection.setRequestProperty(
+                "User-Agent",
+                "WaveLive-Android/1.0"
             )
+
+            if (authenticated) {
+                getToken(context)
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { token ->
+                        connection.setRequestProperty(
+                            "Authorization",
+                            "Bearer $token"
+                        )
+                    }
+            }
+
+            if (
+                method == "POST" ||
+                method == "PUT" ||
+                method == "PATCH"
+            ) {
+                connection.doOutput = true
+
+                val payload =
+                    body?.toString() ?: "{}"
+
+                connection.outputStream.use { output ->
+                    output.write(
+                        payload.toByteArray(
+                            Charsets.UTF_8
+                        )
+                    )
+                    output.flush()
+                }
+            }
+
+            val status =
+                connection.responseCode
+
+            val stream =
+                if (status in 200..399) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
+
+            val response =
+                if (stream != null) {
+                    BufferedReader(
+                        InputStreamReader(
+                            stream,
+                            Charsets.UTF_8
+                        )
+                    ).use {
+                        it.readText()
+                    }
+                } else {
+                    ""
+                }
+
+            val json =
+                if (response.isNotBlank()) {
+                    try {
+                        JSONObject(response)
+                    } catch (_: Exception) {
+                        null
+                    }
+                } else {
+                    null
+                }
+
+            val success =
+                status in 200..299 &&
+                    (
+                        json?.optBoolean(
+                            "success",
+                            true
+                        ) ?: true
+                    )
+
+            val error =
+                json?.optString(
+                    "error",
+                    ""
+                )?.takeIf {
+                    it.isNotBlank()
+                } ?: json?.optString(
+                    "message",
+                    ""
+                )?.takeIf {
+                    it.isNotBlank()
+                } ?: when (status) {
+                    401 -> "Unauthorized"
+                    403 -> "Access denied"
+                    404 -> "Not found"
+                    408 -> "Request timeout"
+                    429 -> "Too many requests"
+                    in 500..599 -> "Server error"
+                    0 -> null
+                    else -> "HTTP $status"
+                }
+
+            ApiResult(
+                success = success,
+                statusCode = status,
+                data = json,
+                error = if (success) null else error
+            )
+
+        } catch (e: Exception) {
+
+            ApiResult(
+                success = false,
+                statusCode = 0,
+                data = null,
+                error =
+                    e.message
+                        ?.takeIf {
+                            it.isNotBlank()
+                        }
+                        ?: "Network error"
+            )
+
+        } finally {
+            connection?.disconnect()
         }
     }
-}
 
-@Composable
-private fun DepositRow(
-    deposit: WaveApi.Deposit
-) {
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = WaveSurface
+    suspend fun health(
+        context: Context
+    ): ApiResult {
+        return request(
+            context = context,
+            method = "GET",
+            path = "/health",
+            authenticated = false
         )
-    ) {
+    }
 
-        Row(
-            modifier = Modifier.padding(13.dp),
-            verticalAlignment =
-                Alignment.CenterVertically
+    suspend fun register(
+        context: Context,
+        username: String,
+        password: String,
+        displayName: String = ""
+    ): Result<Session> {
+
+        val cleanUsername =
+            username
+                .trim()
+                .lowercase()
+
+        if (
+            !Regex(
+                "^[a-z0-9_]{3,24}$"
+            ).matches(cleanUsername)
         ) {
+            return Result.failure(
+                Exception(
+                    "Username must contain 3-24 letters, numbers or _"
+                )
+            )
+        }
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+        if (
+            password.length < 8 ||
+            password.length > 128
+        ) {
+            return Result.failure(
+                Exception(
+                    "Password must be 8-128 characters"
+                )
+            )
+        }
 
-                Text(
-                    text =
-                        "${deposit.amount} — ${deposit.coins} Coins",
-                    color = WaveWhite,
-                    fontWeight = FontWeight.Bold
+        val body =
+            JSONObject().apply {
+                put(
+                    "username",
+                    cleanUsername
                 )
 
-                Text(
-                    text = deposit.walletNumber,
-                    color = WaveMuted,
-                    fontSize = 11.sp
+                put(
+                    "password",
+                    password
+                )
+
+                if (displayName.trim().isNotBlank()) {
+                    put(
+                        "displayName",
+                        displayName.trim()
+                    )
+                }
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path = "/api/auth/register",
+                body = body,
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Registration failed"
+                )
+            )
+        }
+
+        return parseSession(
+            context,
+            result.data
+        )
+    }
+
+    suspend fun login(
+        context: Context,
+        username: String,
+        password: String
+    ): Result<Session> {
+
+        val cleanUsername =
+            username
+                .trim()
+                .lowercase()
+
+        if (cleanUsername.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Username is required"
+                )
+            )
+        }
+
+        if (password.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Password is required"
+                )
+            )
+        }
+
+        val body =
+            JSONObject().apply {
+                put(
+                    "username",
+                    cleanUsername
+                )
+
+                put(
+                    "password",
+                    password
                 )
             }
 
-            Text(
-                text = deposit.status,
-                color =
-                    when (
-                        deposit.status.lowercase()
-                    ) {
-                        "approved",
-                        "completed",
-                        "success" -> WaveGreen
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path = "/api/auth/login",
+                body = body,
+                authenticated = false
+            )
 
-                        "rejected",
-                        "failed" -> WaveRed
-
-                        else -> WaveGold
-                    },
-                fontSize = 12.sp
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Login failed"
+                )
             )
         }
+
+        return parseSession(
+            context,
+            result.data
+        )
+    }
+
+    suspend fun logout(
+        context: Context
+    ): Result<Boolean> {
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path = "/api/auth/logout"
+            )
+
+        clearSession(context)
+
+        return if (result.success) {
+            Result.success(true)
+        } else {
+            Result.failure(
+                Exception(
+                    result.error
+                        ?: "Logout failed"
+                )
+            )
+        }
+    }
+
+    private fun parseSession(
+        context: Context,
+        json: JSONObject?
+    ): Result<Session> {
+
+        if (json == null) {
+            return Result.failure(
+                Exception(
+                    "Empty server response"
+                )
+            )
+        }
+
+        val token =
+            firstString(
+                json,
+                "token",
+                "accessToken",
+                "access_token"
+            )
+
+        if (token.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Session token missing"
+                )
+            )
+        }
+
+        saveToken(
+            context,
+            token
+        )
+
+        return Result.success(
+            Session(
+                token = token,
+                user =
+                    parseUser(
+                        json.optJSONObject(
+                            "user"
+                        )
+                    ),
+                expiresAt =
+                    firstNullableString(
+                        json,
+                        "expiresAt",
+                        "expires_at"
+                    )
+            )
+        )
+    }
+
+    suspend fun me(
+        context: Context
+    ): Result<User> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/me"
+            )
+
+        if (!result.success) {
+
+            if (result.statusCode == 401) {
+                clearSession(context)
+            }
+
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load account"
+                )
+            )
+        }
+
+        val data =
+            result.data
+
+        val userJson =
+            data?.optJSONObject("user")
+                ?: data
+
+        val user =
+            parseUser(userJson)
+
+        return if (user != null) {
+            Result.success(user)
+        } else {
+            Result.failure(
+                Exception(
+                    "User data missing"
+                )
+            )
+        }
+    }
+
+    suspend fun feed(
+        context: Context,
+        limit: Int = 30,
+        cursor: Int = 0
+    ): Result<List<Video>> {
+
+        val safeLimit =
+            limit.coerceIn(
+                1,
+                100
+            )
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path =
+                    "/api/videos/feed" +
+                        "?limit=" +
+                        safeLimit +
+                        "&cursor=" +
+                        cursor,
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load feed"
+                )
+            )
+        }
+
+        val array =
+            extractArray(
+                result.data,
+                "items",
+                "videos",
+                "data"
+            )
+
+        val videos =
+            mutableListOf<Video>()
+
+        for (
+            index in 0 until array.length()
+        ) {
+            parseVideo(
+                array.optJSONObject(index)
+            )?.let {
+                videos.add(it)
+            }
+        }
+
+        return Result.success(videos)
+    }
+
+    suspend fun likeVideo(
+        context: Context,
+        videoId: String
+    ): Result<Boolean> {
+
+        if (videoId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Video ID is required"
+                )
+            )
+        }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path =
+                    "/api/videos/" +
+                        encodePath(videoId) +
+                        "/like"
+            )
+
+        return if (result.success) {
+            Result.success(true)
+        } else {
+            Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to like video"
+                )
+            )
+        }
+    }
+
+    suspend fun viewVideo(
+        context: Context,
+        videoId: String
+    ): Result<Boolean> {
+
+        if (videoId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Video ID is required"
+                )
+            )
+        }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path =
+                    "/api/videos/" +
+                        encodePath(videoId) +
+                        "/view"
+            )
+
+        return if (result.success) {
+            Result.success(true)
+        } else {
+            Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to register view"
+                )
+            )
+        }
+    }
+
+    suspend fun getLives(
+        context: Context
+    ): Result<List<Live>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/live",
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load live rooms"
+                )
+            )
+        }
+
+        val array =
+            extractArray(
+                result.data,
+                "items",
+                "lives",
+                "live"
+            )
+
+        val lives =
+            mutableListOf<Live>()
+
+        for (
+            index in 0 until array.length()
+        ) {
+            parseLive(
+                array.optJSONObject(index)
+            )?.let {
+                lives.add(it)
+            }
+        }
+
+        return Result.success(lives)
+    }
+
+    suspend fun getLive(
+        context: Context,
+        liveId: String
+    ): Result<Live> {
+
+        if (liveId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Live ID is required"
+                )
+            )
+        }
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path =
+                    "/api/live/" +
+                        encodePath(liveId)
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load live"
+                )
+            )
+        }
+
+        val data =
+            result.data
+
+        val live =
+            parseLive(
+                data?.optJSONObject("live")
+                    ?: data
+            )
+
+        return if (live != null) {
+            Result.success(live)
+        } else {
+            Result.failure(
+                Exception(
+                    "Live data missing"
+                )
+            )
+        }
+    }
+
+    suspend fun createLive(
+        context: Context,
+        title: String
+    ): Result<Live> {
+
+        val cleanTitle =
+            title.trim()
+
+        if (cleanTitle.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Live title is required"
+                )
+            )
+        }
+
+        val body =
+            JSONObject().apply {
+                put(
+                    "title",
+                    cleanTitle.take(150)
+                )
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path = "/api/live",
+                body = body
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to create live"
+                )
+            )
+        }
+
+        val data =
+            result.data
+
+        val live =
+            parseLive(
+                data?.optJSONObject("live")
+                    ?: data
+            )
+
+        return if (live != null) {
+            Result.success(live)
+        } else {
+            Result.failure(
+                Exception(
+                    "Created live data missing"
+                )
+            )
+        }
+    }
+
+    suspend fun updateLive(
+        context: Context,
+        liveId: String,
+        status: String? = null,
+        title: String? = null
+    ): Result<Live> {
+
+        if (liveId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Live ID is required"
+                )
+            )
+        }
+
+        if (
+            status == null &&
+            title == null
+        ) {
+            return Result.failure(
+                Exception(
+                    "Nothing to update"
+                )
+            )
+        }
+
+        val body =
+            JSONObject().apply {
+
+                status?.let {
+                    put(
+                        "status",
+                        it
+                    )
+                }
+
+                title?.let {
+                    put(
+                        "title",
+                        it.trim()
+                    )
+                }
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "PATCH",
+                path =
+                    "/api/live/" +
+                        encodePath(liveId),
+                body = body
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to update live"
+                )
+            )
+        }
+
+        val data =
+            result.data
+
+        val live =
+            parseLive(
+                data?.optJSONObject("live")
+                    ?: data
+            )
+
+        return if (live != null) {
+            Result.success(live)
+        } else {
+            Result.failure(
+                Exception(
+                    "Live data missing"
+                )
+            )
+        }
+    }
+
+    suspend fun getGifts(
+        context: Context
+    ): Result<List<Gift>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/gifts",
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load gifts"
+                )
+            )
+        }
+
+        val array =
+            extractArray(
+                result.data,
+                "items",
+                "gifts"
+            )
+
+        val gifts =
+            mutableListOf<Gift>()
+
+        for (
+            index in 0 until array.length()
+        ) {
+
+            val item =
+                array.optJSONObject(index)
+                    ?: continue
+
+            val id =
+                firstString(
+                    item,
+                    "id"
+                )
+
+            if (id.isBlank()) {
+                continue
+            }
+
+            gifts.add(
+                Gift(
+                    id = id,
+                    name =
+                        firstString(
+                            item,
+                            "name"
+                        ).ifBlank {
+                            "Gift"
+                        },
+                    price =
+                        firstInt(
+                            item,
+                            "price",
+                            "price_coins"
+                        ),
+                    icon =
+                        firstString(
+                            item,
+                            "icon"
+                        ).ifBlank {
+                            "🎁"
+                        },
+                    imageUrl =
+                        firstNullableString(
+                            item,
+                            "imageUrl",
+                            "image_url"
+                        ),
+                    animationUrl =
+                        firstNullableString(
+                            item,
+                            "animationUrl",
+                            "animation_url"
+                        )
+                )
+            )
+        }
+
+        return Result.success(gifts)
+    }
+
+    suspend fun sendGift(
+        context: Context,
+        liveId: String,
+        giftId: String,
+        quantity: Int = 1,
+        receiverUserId: String? = null
+    ): Result<GiftSendResult> {
+
+        if (liveId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Live ID is required"
+                )
+            )
+        }
+
+        if (giftId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Gift ID is required"
+                )
+            )
+        }
+
+        val safeQuantity =
+            quantity.coerceIn(
+                1,
+                100
+            )
+
+        val body =
+            JSONObject().apply {
+
+                put(
+                    "giftId",
+                    giftId
+                )
+
+                put(
+                    "quantity",
+                    safeQuantity
+                )
+
+                receiverUserId
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+                    ?.let {
+                        put(
+                            "receiverUserId",
+                            it
+                        )
+                    }
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path =
+                    "/api/live/" +
+                        encodePath(liveId) +
+                        "/gifts",
+                body = body
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to send gift"
+                )
+            )
+        }
+
+        val data =
+            result.data
+                ?: JSONObject()
+
+        val gift =
+            data.optJSONObject("gift")
+
+        val giftIdResult =
+            firstNullableString(
+                data,
+                "giftId",
+                "gift_id"
+            ) ?: gift?.optString(
+                "id",
+                null
+            )
+
+        val giftNameResult =
+            firstNullableString(
+                data,
+                "giftName",
+                "gift_name"
+            ) ?: gift?.optString(
+                "name",
+                null
+            )
+
+        val totalCoins =
+            firstInt(
+                data,
+                "totalCoins",
+                "total_coins"
+            )
+
+        val remainingCoins =
+            firstInt(
+                data,
+                "remainingCoins",
+                "remaining_coins"
+            )
+
+        return Result.success(
+            GiftSendResult(
+                transactionId =
+                    firstNullableString(
+                        data,
+                        "transactionId",
+                        "transaction_id"
+                    ),
+                remainingCoins =
+                    remainingCoins,
+                giftId =
+                    giftIdResult,
+                giftName =
+                    giftNameResult,
+                quantity =
+                    data.optInt(
+                        "quantity",
+                        safeQuantity
+                    ),
+                totalCoins =
+                    totalCoins
+            )
+        )
+    }
+
+    suspend fun getMusic(
+        context: Context
+    ): Result<List<MusicTrack>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/music",
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load music"
+                )
+            )
+        }
+
+        val array =
+            extractArray(
+                result.data,
+                "items",
+                "music",
+                "tracks"
+            )
+
+        val tracks =
+            mutableListOf<MusicTrack>()
+
+        for (
+            index in 0 until array.length()
+        ) {
+
+            val item =
+                array.optJSONObject(index)
+                    ?: continue
+
+            val id =
+                firstString(
+                    item,
+                    "id"
+                )
+
+            if (id.isBlank()) {
+                continue
+            }
+
+            tracks.add(
+                MusicTrack(
+                    id = id,
+                    title =
+                        firstString(
+                            item,
+                            "title",
+                            "name"
+                        ),
+                    artist =
+                        firstString(
+                            item,
+                            "artist"
+                        ),
+                    audioUrl =
+                        firstString(
+                            item,
+                            "audioUrl",
+                            "audio_url",
+                            "url"
+                        ),
+                    coverUrl =
+                        firstNullableString(
+                            item,
+                            "coverUrl",
+                            "cover_url"
+                        ),
+                    durationSeconds =
+                        firstInt(
+                            item,
+                            "durationSeconds",
+                            "duration_seconds",
+                            "duration"
+                        )
+                )
+            )
+        }
+
+        return Result.success(tracks)
+    }
+
+    suspend fun getEffects(
+        context: Context
+    ): Result<List<VisualEffect>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/effects",
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load effects"
+                )
+            )
+        }
+
+        val array =
+            extractArray(
+                result.data,
+                "items",
+                "effects"
+            )
+
+        val effects =
+            mutableListOf<VisualEffect>()
+
+        for (
+            index in 0 until array.length()
+        ) {
+
+            val item =
+                array.optJSONObject(index)
+                    ?: continue
+
+            val id =
+                firstString(
+                    item,
+                    "id"
+                )
+
+            if (id.isBlank()) {
+                continue
+            }
+
+            effects.add(
+                VisualEffect(
+                    id = id,
+                    name =
+                        firstString(
+                            item,
+                            "name"
+                        ).ifBlank {
+                            "Effect"
+                        },
+                    type =
+                        firstString(
+                            item,
+                            "type"
+                        ),
+                    value =
+                        firstString(
+                            item,
+                            "value"
+                        )
+                )
+            )
+        }
+
+        return Result.success(effects)
+    }
+
+    suspend fun getWallet(
+        context: Context
+    ): Result<Wallet> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/wallet"
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load wallet"
+                )
+            )
+        }
+
+        val data =
+            result.data
+                ?: JSONObject()
+
+        return Result.success(
+            Wallet(
+                coins =
+                    firstInt(
+                        data,
+                        "coins",
+                        "balance"
+                    ),
+                walletNumbers =
+                    jsonStringList(
+                        data.optJSONArray(
+                            "walletNumbers"
+                        )
+                            ?: data.optJSONArray(
+                                "wallet_numbers"
+                            )
+                    ),
+                paymentMethods =
+                    jsonStringList(
+                        data.optJSONArray(
+                            "paymentMethods"
+                        )
+                            ?: data.optJSONArray(
+                                "payment_methods"
+                            )
+                    )
+            )
+        )
+    }
+
+    suspend fun createWalletDeposit(
+        context: Context,
+        amount: Int,
+        walletNumber: String,
+        transactionReference: String? = null
+    ): Result<Deposit> {
+
+        if (amount <= 0) {
+            return Result.failure(
+                Exception(
+                    "Amount must be greater than zero"
+                )
+            )
+        }
+
+        if (walletNumber.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Wallet number is required"
+                )
+            )
+        }
+
+        val body =
+            JSONObject().apply {
+
+                put(
+                    "amount",
+                    amount
+                )
+
+                put(
+                    "walletNumber",
+                    walletNumber
+                )
+
+                transactionReference
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+                    ?.let {
+                        put(
+                            "transactionReference",
+                            it.trim()
+                        )
+                    }
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path = "/api/wallet/deposit",
+                body = body
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to create deposit"
+                )
+            )
+        }
+
+        val data =
+            result.data
+                ?: JSONObject()
+
+        return Result.success(
+            Deposit(
+                id =
+                    firstString(
+                        data,
+                        "depositId",
+                        "deposit_id",
+                        "id"
+                    ),
+                amount =
+                    firstInt(
+                        data,
+                        "amount"
+                    ).let {
+                        if (it > 0) it else amount
+                    },
+                walletNumber =
+                    firstString(
+                        data,
+                        "walletNumber",
+                        "wallet_number"
+                    ).ifBlank {
+                        walletNumber
+                    },
+                transactionReference =
+                    firstNullableString(
+                        data,
+                        "transactionReference",
+                        "transaction_reference"
+                    ) ?: transactionReference,
+                coins =
+                    firstInt(
+                        data,
+                        "coins"
+                    ),
+                status =
+                    firstString(
+                        data,
+                        "status"
+                    ).ifBlank {
+                        "pending"
+                    },
+                createdAt =
+                    firstNullableString(
+                        data,
+                        "createdAt",
+                        "created_at"
+                    ),
+                updatedAt =
+                    firstNullableString(
+                        data,
+                        "updatedAt",
+                        "updated_at"
+                    )
+            )
+        )
+    }
+
+    suspend fun getWalletDeposits(
+        context: Context
+    ): Result<List<Deposit>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/wallet/deposits"
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load deposits"
+                )
+            )
+        }
+
+        val array =
+            extractArray(
+                result.data,
+                "items",
+                "deposits"
+            )
+
+        val deposits =
+            mutableListOf<Deposit>()
+
+        for (
+            index in 0 until array.length()
+        ) {
+
+            val item =
+                array.optJSONObject(index)
+                    ?: continue
+
+            deposits.add(
+                Deposit(
+                    id =
+                        firstString(
+                            item,
+                            "id",
+                            "depositId",
+                            "deposit_id"
+                        ),
+                    amount =
+                        firstInt(
+                            item,
+                            "amount"
+                        ),
+                    walletNumber =
+                        firstString(
+                            item,
+                            "walletNumber",
+                            "wallet_number"
+                        ),
+                    transactionReference =
+                        firstNullableString(
+                            item,
+                            "transactionReference",
+                            "transaction_reference"
+                        ),
+                    coins =
+                        firstInt(
+                            item,
+                            "coins"
+                        ),
+                    status =
+                        firstString(
+                            item,
+                            "status"
+                        ).ifBlank {
+                            "pending"
+                        },
+                    createdAt =
+                        firstNullableString(
+                            item,
+                            "createdAt",
+                            "created_at"
+                        ),
+                    updatedAt =
+                        firstNullableString(
+                            item,
+                            "updatedAt",
+                            "updated_at"
+                        )
+                )
+            )
+        }
+
+        return Result.success(deposits)
+    }
+
+    suspend fun getUser(
+        context: Context,
+        userId: String
+    ): Result<User> {
+
+        if (userId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "User ID is required"
+                )
+            )
+        }
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path =
+                    "/api/users/" +
+                        encodePath(userId),
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load user"
+                )
+            )
+        }
+
+        val data =
+            result.data
+
+        val user =
+            parseUser(
+                data?.optJSONObject("user")
+                    ?: data
+            )
+
+        return if (user != null) {
+            Result.success(user)
+        } else {
+            Result.failure(
+                Exception(
+                    "User data missing"
+                )
+            )
+        }
+    }
+
+    suspend fun followUser(
+        context: Context,
+        userId: String
+    ): Result<Boolean> {
+
+        if (userId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "User ID is required"
+                )
+            )
+        }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path =
+                    "/api/users/" +
+                        encodePath(userId) +
+                        "/follow"
+            )
+
+        return if (result.success) {
+            Result.success(true)
+        } else {
+            Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to follow user"
+                )
+            )
+        }
+    }
+
+    suspend fun getComments(
+        context: Context,
+        videoId: String
+    ): Result<List<JSONObject>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path =
+                    "/api/videos/" +
+                        encodePath(videoId) +
+                        "/comments"
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load comments"
+                )
+            )
+        }
+
+        val array =
+            extractArray(
+                result.data,
+                "items",
+                "comments"
+            )
+
+        val list =
+            mutableListOf<JSONObject>()
+
+        for (
+            index in 0 until array.length()
+        ) {
+            array.optJSONObject(index)
+                ?.let {
+                    list.add(it)
+                }
+        }
+
+        return Result.success(list)
+    }
+
+    suspend fun addComment(
+        context: Context,
+        videoId: String,
+        text: String
+    ): Result<JSONObject> {
+
+        val cleanText =
+            text.trim()
+
+        if (
+            videoId.isBlank() ||
+            cleanText.isBlank()
+        ) {
+            return Result.failure(
+                Exception(
+                    "Comment information is incomplete"
+                )
+            )
+        }
+
+        val body =
+            JSONObject().apply {
+                put(
+                    "text",
+                    cleanText.take(500)
+                )
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path =
+                    "/api/videos/" +
+                        encodePath(videoId) +
+                        "/comments",
+                body = body
+            )
+
+        return if (result.success) {
+            Result.success(
+                result.data ?: JSONObject()
+            )
+        } else {
+            Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to add comment"
+                )
+            )
+        }
+    }
+
+    suspend fun getGiftHistory(
+        context: Context
+    ): Result<List<JSONObject>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/gifts/history"
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load gift history"
+                )
+            )
+        }
+
+        val array =
+            extractArray(
+                result.data,
+                "items",
+                "history"
+            )
+
+        val list =
+            mutableListOf<JSONObject>()
+
+        for (
+            index in 0 until array.length()
+        ) {
+            array.optJSONObject(index)
+                ?.let {
+                    list.add(it)
+                }
+        }
+
+        return Result.success(list)
+    }
+
+    suspend fun report(
+        context: Context,
+        targetType: String,
+        targetId: String,
+        reason: String
+    ): Result<String> {
+
+        if (
+            targetType.isBlank() ||
+            targetId.isBlank() ||
+            reason.trim().isBlank()
+        ) {
+            return Result.failure(
+                Exception(
+                    "Report information is incomplete"
+                )
+            )
+        }
+
+        val body =
+            JSONObject().apply {
+
+                put(
+                    "targetType",
+                    targetType
+                )
+
+                put(
+                    "targetId",
+                    targetId
+                )
+
+                put(
+                    "reason",
+                    reason.trim().take(500)
+                )
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path = "/api/reports",
+                body = body
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to submit report"
+                )
+            )
+        }
+
+        return Result.success(
+            firstString(
+                result.data ?: JSONObject(),
+                "reportId",
+                "report_id",
+                "id"
+            )
+        )
+    }
+
+    private fun parseUser(
+        json: JSONObject?
+    ): User? {
+
+        if (json == null) {
+            return null
+        }
+
+        val id =
+            firstString(
+                json,
+                "id",
+                "userId",
+                "user_id"
+            )
+
+        if (id.isBlank()) {
+            return null
+        }
+
+        return User(
+            id = id,
+
+            username =
+                firstString(
+                    json,
+                    "username"
+                ),
+
+            displayName =
+                firstString(
+                    json,
+                    "displayName",
+                    "display_name"
+                ).ifBlank {
+                    firstString(
+                        json,
+                        "username"
+                    )
+                },
+
+            avatar =
+                firstNullableString(
+                    json,
+                    "avatar",
+                    "avatar_url"
+                ),
+
+            bio =
+                firstNullableString(
+                    json,
+                    "bio"
+                ),
+
+            coins =
+                firstInt(
+                    json,
+                    "coins",
+                    "balance"
+                ),
+
+            followers =
+                firstInt(
+                    json,
+                    "followers",
+                    "followersCount",
+                    "followers_count"
+                ),
+
+            following =
+                firstInt(
+                    json,
+                    "following",
+                    "followingCount",
+                    "following_count"
+                ),
+
+            verified =
+                json.optBoolean(
+                    "verified",
+                    false
+                )
+        )
+    }
+
+    private fun parseVideo(
+        json: JSONObject?
+    ): Video? {
+
+        if (json == null) {
+            return null
+        }
+
+        val id =
+            firstString(
+                json,
+                "id",
+                "videoId",
+                "video_id"
+            )
+
+        if (id.isBlank()) {
+            return null
+        }
+
+        return Video(
+            id = id,
+
+            userId =
+                firstString(
+                    json,
+                    "userId",
+                    "user_id"
+                ),
+
+            username =
+                firstString(
+                    json,
+                    "username"
+                ),
+
+            displayName =
+                firstString(
+                    json,
+                    "displayName",
+                    "display_name"
+                ).ifBlank {
+                    firstString(
+                        json,
+                        "username"
+                    )
+                },
+
+            avatar =
+                firstNullableString(
+                    json,
+                    "avatar",
+                    "avatar_url"
+                ),
+
+            videoUrl =
+                firstString(
+                    json,
+                    "videoUrl",
+                    "video_url",
+                    "url"
+                ),
+
+            thumbnailUrl =
+                firstNullableString(
+                    json,
+                    "thumbnailUrl",
+                    "thumbnail_url",
+                    "thumbnail"
+                ),
+
+            caption =
+                firstString(
+                    json,
+                    "caption",
+                    "description"
+                ),
+
+            musicName =
+                firstNullableString(
+                    json,
+                    "musicName",
+                    "music_name"
+                ),
+
+            likes =
+                firstInt(
+                    json,
+                    "likes",
+                    "likeCount",
+                    "like_count"
+                ),
+
+            comments =
+                firstInt(
+                    json,
+                    "comments",
+                    "commentCount",
+                    "comment_count"
+                ),
+
+            shares =
+                firstInt(
+                    json,
+                    "shares",
+                    "shareCount",
+                    "share_count"
+                ),
+
+            views =
+                firstInt(
+                    json,
+                    "views",
+                    "viewCount",
+                    "view_count"
+                ),
+
+            liked =
+                json.optBoolean(
+                    "liked",
+                    false
+                ),
+
+            createdAt =
+                firstNullableString(
+                    json,
+                    "createdAt",
+                    "created_at"
+                )
+        )
+    }
+
+    private fun parseLive(
+        json: JSONObject?
+    ): Live? {
+
+        if (json == null) {
+            return null
+        }
+
+        val id =
+            firstString(
+                json,
+                "id",
+                "liveId",
+                "live_id"
+            )
+
+        if (id.isBlank()) {
+            return null
+        }
+
+        return Live(
+            id = id,
+
+            userId =
+                firstString(
+                    json,
+                    "userId",
+                    "user_id"
+                ),
+
+            username =
+                firstString(
+                    json,
+                    "username"
+                ),
+
+            displayName =
+                firstString(
+                    json,
+                    "displayName",
+                    "display_name"
+                ).ifBlank {
+                    firstString(
+                        json,
+                        "username"
+                    )
+                },
+
+            avatar =
+                firstNullableString(
+                    json,
+                    "avatar",
+                    "avatar_url"
+                ),
+
+            title =
+                firstString(
+                    json,
+                    "title"
+                ),
+
+            streamUrl =
+                firstNullableString(
+                    json,
+                    "streamUrl",
+                    "stream_url"
+                ),
+
+            playbackUrl =
+                firstNullableString(
+                    json,
+                    "playbackUrl",
+                    "playback_url",
+                    "playback"
+                ),
+
+            rtmpsUrl =
+                firstNullableString(
+                    json,
+                    "rtmpsUrl",
+                    "rtmps_url",
+                    "rtmpUrl",
+                    "rtmp_url"
+                ),
+
+            streamKey =
+                firstNullableString(
+                    json,
+                    "streamKey",
+                    "stream_key"
+                ),
+
+            viewerCount =
+                firstInt(
+                    json,
+                    "viewerCount",
+                    "viewer_count",
+                    "viewers"
+                ),
+
+            likes =
+                firstInt(
+                    json,
+                    "likes",
+                    "likeCount",
+                    "like_count"
+                ),
+
+            status =
+                firstString(
+                    json,
+                    "status"
+                ).ifBlank {
+                    "active"
+                },
+
+            startedAt =
+                firstNullableString(
+                    json,
+                    "startedAt",
+                    "started_at"
+                )
+        )
+    }
+
+    private fun firstString(
+        json: JSONObject,
+        vararg keys: String
+    ): String {
+
+        for (key in keys) {
+
+            if (!json.has(key)) {
+                continue
+            }
+
+            val value =
+                json.optString(
+                    key,
+                    ""
+                ).trim()
+
+            if (value.isNotBlank()) {
+                return value
+            }
+        }
+
+        return ""
+    }
+
+    private fun firstNullableString(
+        json: JSONObject,
+        vararg keys: String
+    ): String? {
+
+        for (key in keys) {
+
+            if (!json.has(key)) {
+                continue
+            }
+
+            val value =
+                json.optString(
+                    key,
+                    ""
+                ).trim()
+
+            if (
+                value.isNotBlank() &&
+                value.lowercase() != "null"
+            ) {
+                return value
+            }
+        }
+
+        return null
+    }
+
+    private fun firstInt(
+        json: JSONObject,
+        vararg keys: String
+    ): Int {
+
+        for (key in keys) {
+
+            if (!json.has(key)) {
+                continue
+            }
+
+            val value =
+                json.optInt(
+                    key,
+                    Int.MIN_VALUE
+                )
+
+            if (value != Int.MIN_VALUE) {
+                return value
+            }
+
+            val text =
+                json.optString(
+                    key,
+                    ""
+                )
+
+            text.toIntOrNull()
+                ?.let {
+                    return it
+                }
+        }
+
+        return 0
+    }
+
+    private fun extractArray(
+        json: JSONObject?,
+        vararg keys: String
+    ): JSONArray {
+
+        if (json == null) {
+            return JSONArray()
+        }
+
+        for (key in keys) {
+
+            val direct =
+                json.optJSONArray(key)
+
+            if (direct != null) {
+                return direct
+            }
+
+            val nested =
+                json.optJSONObject(key)
+
+            if (nested != null) {
+
+                val nestedArray =
+                    nested.optJSONArray("items")
+                        ?: nested.optJSONArray("data")
+                        ?: nested.optJSONArray("results")
+
+                if (nestedArray != null) {
+                    return nestedArray
+                }
+            }
+        }
+
+        return JSONArray()
+    }
+
+    private fun jsonStringList(
+        array: JSONArray?
+    ): List<String> {
+
+        if (array == null) {
+            return emptyList()
+        }
+
+        val result =
+            mutableListOf<String>()
+
+        for (
+            index in 0 until array.length()
+        ) {
+
+            val value =
+                array.optString(
+                    index,
+                    ""
+                ).trim()
+
+            if (value.isNotBlank()) {
+                result.add(value)
+            }
+        }
+
+        return result
+    }
+
+    private fun encodePath(
+        value: String
+    ): String {
+
+        return URLEncoder
+            .encode(
+                value,
+                "UTF-8"
+            )
+            .replace(
+                "+",
+                "%20"
+            )
     }
 }
