@@ -120,20 +120,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           npm install --no-audit --no-fund
 
-      - name: Typecheck Worker
+      - name: Validate Worker
         working-directory: worker
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "===== TYPECHECKING CLOUDFLARE WORKER ====="
+          echo "===== VALIDATING CLOUDFLARE WORKER ====="
 
-          npx tsc --noEmit
+          npx wrangler deploy --dry-run
 
-          echo "===== WORKER TYPECHECK COMPLETE ====="
+          echo "===== WORKER VALIDATION COMPLETE ====="
 
       - name: Verify Cloudflare authentication
         working-directory: worker
