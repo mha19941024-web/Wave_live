@@ -196,6 +196,7 @@ object WaveApi {
             connection.readTimeout = 20000
             connection.useCaches = false
             connection.doInput = true
+            connection.instanceFollowRedirects = true
 
             connection.setRequestProperty(
                 "Accept",
@@ -207,9 +208,16 @@ object WaveApi {
                 "application/json; charset=utf-8"
             )
 
+            connection.setRequestProperty(
+                "User-Agent",
+                "WaveLive-Android/1.0"
+            )
+
             if (authenticated) {
                 getToken(context)
-                    ?.takeIf { it.isNotBlank() }
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
                     ?.let { token ->
                         connection.setRequestProperty(
                             "Authorization",
@@ -298,16 +306,31 @@ object WaveApi {
                     if (success) {
                         null
                     } else {
-                        message ?: "HTTP $status"
+                        message ?: when (status) {
+                            401 -> "Unauthorized"
+                            403 -> "Access denied"
+                            404 -> "Not found"
+                            408 -> "Request timeout"
+                            429 -> "Too many requests"
+                            in 500..599 ->
+                                "Server error"
+                            else ->
+                                "HTTP $status"
+                        }
                     }
             )
         } catch (e: Exception) {
+
             ApiResult(
                 success = false,
                 statusCode = 0,
                 data = null,
                 error =
-                    e.message ?: "Network error"
+                    e.message
+                        ?.takeIf {
+                            it.isNotBlank()
+                        }
+                        ?: "Network error"
             )
         } finally {
             connection?.disconnect()
@@ -333,7 +356,9 @@ object WaveApi {
     ): Result<Session> {
 
         val cleanUsername =
-            username.trim().lowercase()
+            username
+                .trim()
+                .lowercase()
 
         if (
             !Regex(
@@ -353,7 +378,7 @@ object WaveApi {
         ) {
             return Result.failure(
                 Exception(
-                    "Password must be at least 8 characters"
+                    "Password must be 8-128 characters"
                 )
             )
         }
@@ -364,19 +389,21 @@ object WaveApi {
                     "username",
                     cleanUsername
                 )
+
                 put(
                     "password",
                     password
                 )
 
+                val cleanDisplayName =
+                    displayName.trim()
+
                 if (
-                    displayName
-                        .trim()
-                        .isNotEmpty()
+                    cleanDisplayName.isNotEmpty()
                 ) {
                     put(
                         "displayName",
-                        displayName.trim()
+                        cleanDisplayName
                     )
                 }
             }
@@ -411,12 +438,34 @@ object WaveApi {
         password: String
     ): Result<Session> {
 
+        val cleanUsername =
+            username
+                .trim()
+                .lowercase()
+
+        if (cleanUsername.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Username is required"
+                )
+            )
+        }
+
+        if (password.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Password is required"
+                )
+            )
+        }
+
         val body =
             JSONObject().apply {
                 put(
                     "username",
-                    username.trim().lowercase()
+                    cleanUsername
                 )
+
                 put(
                     "password",
                     password
@@ -484,22 +533,30 @@ object WaveApi {
             )
 
         if (!result.success) {
-            clearSession(context)
+
+            if (
+                result.statusCode == 401
+            ) {
+                clearSession(context)
+            }
 
             return Result.failure(
                 Exception(
                     result.error
-                        ?: "Session expired"
+                        ?: "Unable to load account"
                 )
             )
         }
 
+        val data =
+            result.data
+
+        val userJson =
+            data?.optJSONObject("user")
+                ?: data
+
         val user =
-            parseUser(
-                result.data
-                    ?.optJSONObject("user")
-                    ?: result.data
-            )
+            parseUser(userJson)
 
         return if (user != null) {
             Result.success(user)
@@ -531,6 +588,7 @@ object WaveApi {
             me(context)
 
         return if (current.isSuccess) {
+
             Result.success(
                 Session(
                     token = token,
@@ -538,7 +596,9 @@ object WaveApi {
                     expiresAt = null
                 )
             )
+
         } else {
+
             clearSession(context)
 
             Result.failure(
@@ -566,7 +626,7 @@ object WaveApi {
             json.optString(
                 "token",
                 ""
-            )
+            ).trim()
 
         if (token.isBlank()) {
             return Result.failure(
@@ -586,7 +646,9 @@ object WaveApi {
                 token = token,
                 user =
                     parseUser(
-                        json.optJSONObject("user")
+                        json.optJSONObject(
+                            "user"
+                        )
                     ),
                 expiresAt =
                     json.optString(
@@ -626,7 +688,10 @@ object WaveApi {
         val tracks =
             mutableListOf<MusicTrack>()
 
-        for (index in 0 until array.length()) {
+        for (
+            index in 0 until array.length()
+        ) {
+
             val item =
                 array.optJSONObject(index)
                     ?: continue
@@ -655,28 +720,22 @@ object WaveApi {
                             ""
                         ),
                     audioUrl =
-                        item.optString(
-                            "audio_url",
-                            item.optString(
-                                "audioUrl",
-                                ""
-                            )
+                        firstString(
+                            item,
+                            "audioUrl",
+                            "audio_url"
                         ),
                     coverUrl =
-                        item.optString(
-                            "cover_url",
-                            item.optString(
-                                "coverUrl",
-                                null
-                            )
+                        firstNullableString(
+                            item,
+                            "coverUrl",
+                            "cover_url"
                         ),
                     durationSeconds =
-                        item.optInt(
-                            "duration_seconds",
-                            item.optInt(
-                                "durationSeconds",
-                                0
-                            )
+                        firstInt(
+                            item,
+                            "durationSeconds",
+                            "duration_seconds"
                         )
                 )
             )
@@ -714,7 +773,10 @@ object WaveApi {
         val effects =
             mutableListOf<VisualEffect>()
 
-        for (index in 0 until array.length()) {
+        for (
+            index in 0 until array.length()
+        ) {
+
             val item =
                 array.optJSONObject(index)
                     ?: continue
@@ -782,7 +844,10 @@ object WaveApi {
         val gifts =
             mutableListOf<Gift>()
 
-        for (index in 0 until array.length()) {
+        for (
+            index in 0 until array.length()
+        ) {
+
             val item =
                 array.optJSONObject(index)
                     ?: continue
@@ -806,33 +871,27 @@ object WaveApi {
                             "Gift"
                         ),
                     price =
-                        item.optInt(
+                        firstInt(
+                            item,
                             "price",
-                            item.optInt(
-                                "price_coins",
-                                0
-                            )
+                            "price_coins"
                         ),
                     icon =
                         item.optString(
                             "icon",
-                            "G"
+                            "🎁"
                         ),
                     imageUrl =
-                        item.optString(
+                        firstNullableString(
+                            item,
                             "imageUrl",
-                            item.optString(
-                                "image_url",
-                                null
-                            )
+                            "image_url"
                         ),
                     animationUrl =
-                        item.optString(
+                        firstNullableString(
+                            item,
                             "animationUrl",
-                            item.optString(
-                                "animation_url",
-                                null
-                            )
+                            "animation_url"
                         )
                 )
             )
@@ -841,6 +900,14 @@ object WaveApi {
         return Result.success(gifts)
     }
 
+    /*
+     * IMPORTANT:
+     * Worker /api/feed uses:
+     *   limit
+     *   offset
+     *
+     * It does NOT use cursor.
+     */
     suspend fun feed(
         context: Context,
         limit: Int = 20,
@@ -848,9 +915,12 @@ object WaveApi {
     ): Result<List<Video>> {
 
         val safeLimit =
-            limit.coerceIn(1, 50)
+            limit.coerceIn(
+                1,
+                50
+            )
 
-        val safeCursor =
+        val safeOffset =
             cursor.coerceAtLeast(0)
 
         val result =
@@ -859,8 +929,10 @@ object WaveApi {
                 method = "GET",
                 path =
                     "/api/feed" +
-                        "?limit=$safeLimit" +
-                        "&cursor=$safeCursor"
+                        "?limit=" +
+                        safeLimit +
+                        "&offset=" +
+                        safeOffset
             )
 
         if (!result.success) {
@@ -880,7 +952,10 @@ object WaveApi {
         val videos =
             mutableListOf<Video>()
 
-        for (index in 0 until array.length()) {
+        for (
+            index in 0 until array.length()
+        ) {
+
             parseVideo(
                 array.optJSONObject(index)
             )?.let {
@@ -919,7 +994,10 @@ object WaveApi {
         val lives =
             mutableListOf<Live>()
 
-        for (index in 0 until array.length()) {
+        for (
+            index in 0 until array.length()
+        ) {
+
             parseLive(
                 array.optJSONObject(index)
             )?.let {
@@ -971,11 +1049,14 @@ object WaveApi {
             )
         }
 
+        val data =
+            result.data
+
         val live =
-            parseLive(
-                result.data
-                    ?.optJSONObject("live")
-            )
+            data?.optJSONObject("live")
+                ?: data?.let {
+                    parseLive(it)
+                }
 
         return if (live != null) {
             Result.success(live)
@@ -1019,11 +1100,14 @@ object WaveApi {
             )
         }
 
+        val data =
+            result.data
+
         val live =
-            parseLive(
-                result.data
-                    ?.optJSONObject("live")
-            )
+            data?.optJSONObject("live")
+                ?: data?.let {
+                    parseLive(it)
+                }
 
         return if (live != null) {
             Result.success(live)
@@ -1043,6 +1127,25 @@ object WaveApi {
         title: String? = null
     ): Result<Live> {
 
+        if (liveId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Live ID is required"
+                )
+            )
+        }
+
+        if (
+            status == null &&
+            title == null
+        ) {
+            return Result.failure(
+                Exception(
+                    "Nothing to update"
+                )
+            )
+        }
+
         val body =
             JSONObject()
 
@@ -1056,7 +1159,7 @@ object WaveApi {
         if (title != null) {
             body.put(
                 "title",
-                title
+                title.trim()
             )
         }
 
@@ -1079,11 +1182,14 @@ object WaveApi {
             )
         }
 
+        val data =
+            result.data
+
         val live =
-            parseLive(
-                result.data
-                    ?.optJSONObject("live")
-            )
+            data?.optJSONObject("live")
+                ?: data?.let {
+                    parseLive(it)
+                }
 
         return if (live != null) {
             Result.success(live)
@@ -1104,15 +1210,36 @@ object WaveApi {
         receiverUserId: String? = null
     ): Result<GiftSendResult> {
 
+        if (liveId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Live ID is required"
+                )
+            )
+        }
+
+        if (giftId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Gift ID is required"
+                )
+            )
+        }
+
         val safeQuantity =
-            quantity.coerceIn(1, 100)
+            quantity.coerceIn(
+                1,
+                100
+            )
 
         val body =
             JSONObject().apply {
+
                 put(
                     "giftId",
                     giftId
                 )
+
                 put(
                     "quantity",
                     safeQuantity
@@ -1163,14 +1290,18 @@ object WaveApi {
         return Result.success(
             GiftSendResult(
                 transactionId =
-                    data.optString(
+                    firstNullableString(
+                        data,
                         "transactionId",
-                        null
+                        "transaction_id"
                     ),
                 remainingCoins =
                     data.optInt(
                         "remainingCoins",
-                        0
+                        data.optInt(
+                            "remaining_coins",
+                            0
+                        )
                     ),
                 giftId =
                     gift?.optString(
@@ -1190,7 +1321,10 @@ object WaveApi {
                 totalCoins =
                     gift?.optInt(
                         "totalCoins",
-                        0
+                        gift?.optInt(
+                            "total_coins",
+                            0
+                        ) ?: 0
                     ) ?: 0
             )
         )
@@ -1200,6 +1334,14 @@ object WaveApi {
         context: Context,
         videoId: String
     ): Result<Boolean> {
+
+        if (videoId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Video ID is required"
+                )
+            )
+        }
 
         val result =
             request(
@@ -1218,6 +1360,236 @@ object WaveApi {
                 Exception(
                     result.error
                         ?: "Unable to like video"
+                )
+            )
+        }
+    }
+
+    suspend fun viewVideo(
+        context: Context,
+        videoId: String
+    ): Result<Boolean> {
+
+        if (videoId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Video ID is required"
+                )
+            )
+        }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path =
+                    "/api/videos/" +
+                        encodePath(videoId) +
+                        "/view"
+            )
+
+        return if (result.success) {
+            Result.success(true)
+        } else {
+            Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to register view"
+                )
+            )
+        }
+    }
+
+    suspend fun getComments(
+        context: Context,
+        videoId: String
+    ): Result<List<JSONObject>> {
+
+        if (videoId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Video ID is required"
+                )
+            )
+        }
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path =
+                    "/api/videos/" +
+                        encodePath(videoId) +
+                        "/comments"
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load comments"
+                )
+            )
+        }
+
+        val array =
+            result.data
+                ?.optJSONArray("items")
+                ?: JSONArray()
+
+        val comments =
+            mutableListOf<JSONObject>()
+
+        for (
+            index in 0 until array.length()
+        ) {
+            array.optJSONObject(index)
+                ?.let {
+                    comments.add(it)
+                }
+        }
+
+        return Result.success(comments)
+    }
+
+    suspend fun addComment(
+        context: Context,
+        videoId: String,
+        text: String
+    ): Result<JSONObject> {
+
+        if (videoId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Video ID is required"
+                )
+            )
+        }
+
+        val cleanText =
+            text.trim()
+
+        if (cleanText.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Comment cannot be empty"
+                )
+            )
+        }
+
+        val body =
+            JSONObject().apply {
+                put(
+                    "text",
+                    cleanText.take(500)
+                )
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path =
+                    "/api/videos/" +
+                        encodePath(videoId) +
+                        "/comments",
+                body = body
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to add comment"
+                )
+            )
+        }
+
+        return Result.success(
+            result.data
+                ?: JSONObject()
+        )
+    }
+
+    suspend fun getUser(
+        context: Context,
+        userId: String
+    ): Result<User> {
+
+        if (userId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "User ID is required"
+                )
+            )
+        }
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path =
+                    "/api/users/" +
+                        encodePath(userId)
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load user"
+                )
+            )
+        }
+
+        val user =
+            parseUser(
+                result.data
+                    ?.optJSONObject("user")
+                    ?: result.data
+            )
+
+        return if (user != null) {
+            Result.success(user)
+        } else {
+            Result.failure(
+                Exception(
+                    "User data missing"
+                )
+            )
+        }
+    }
+
+    suspend fun followUser(
+        context: Context,
+        userId: String
+    ): Result<Boolean> {
+
+        if (userId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "User ID is required"
+                )
+            )
+        }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path =
+                    "/api/users/" +
+                        encodePath(userId) +
+                        "/follow"
+            )
+
+        return if (result.success) {
+            Result.success(true)
+        } else {
+            Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to follow user"
                 )
             )
         }
@@ -1299,10 +1671,12 @@ object WaveApi {
 
         val body =
             JSONObject().apply {
+
                 put(
                     "amount",
                     amount
                 )
+
                 put(
                     "walletNumber",
                     walletNumber
@@ -1314,7 +1688,7 @@ object WaveApi {
                 ) {
                     put(
                         "transactionReference",
-                        transactionReference
+                        transactionReference.trim()
                     )
                 }
             }
@@ -1347,14 +1721,30 @@ object WaveApi {
         return Result.success(
             Deposit(
                 id =
-                    data.optString(
+                    firstString(
+                        data,
                         "depositId",
-                        ""
+                        "deposit_id"
                     ),
-                amount = amount,
-                walletNumber = walletNumber,
+                amount =
+                    data.optInt(
+                        "amount",
+                        amount
+                    ),
+                walletNumber =
+                    firstString(
+                        data,
+                        "walletNumber",
+                        "wallet_number"
+                    ).ifBlank {
+                        walletNumber
+                    },
                 transactionReference =
-                    transactionReference,
+                    firstNullableString(
+                        data,
+                        "transactionReference",
+                        "transaction_reference"
+                    ) ?: transactionReference,
                 coins =
                     data.optInt(
                         "coins",
@@ -1365,8 +1755,18 @@ object WaveApi {
                         "status",
                         "pending"
                     ),
-                createdAt = null,
-                updatedAt = null
+                createdAt =
+                    firstNullableString(
+                        data,
+                        "createdAt",
+                        "created_at"
+                    ),
+                updatedAt =
+                    firstNullableString(
+                        data,
+                        "updatedAt",
+                        "updated_at"
+                    )
             )
         )
     }
@@ -1399,7 +1799,9 @@ object WaveApi {
         val deposits =
             mutableListOf<Deposit>()
 
-        for (index in 0 until array.length()) {
+        for (
+            index in 0 until array.length()
+        ) {
 
             val item =
                 array.optJSONObject(index)
@@ -1418,20 +1820,16 @@ object WaveApi {
                             0
                         ),
                     walletNumber =
-                        item.optString(
-                            "wallet_number",
-                            item.optString(
-                                "walletNumber",
-                                ""
-                            )
+                        firstString(
+                            item,
+                            "walletNumber",
+                            "wallet_number"
                         ),
                     transactionReference =
-                        item.optString(
-                            "transaction_reference",
-                            item.optString(
-                                "transactionReference",
-                                null
-                            )
+                        firstNullableString(
+                            item,
+                            "transactionReference",
+                            "transaction_reference"
                         ),
                     coins =
                         item.optInt(
@@ -1444,26 +1842,62 @@ object WaveApi {
                             "pending"
                         ),
                     createdAt =
-                        item.optString(
-                            "created_at",
-                            item.optString(
-                                "createdAt",
-                                null
-                            )
+                        firstNullableString(
+                            item,
+                            "createdAt",
+                            "created_at"
                         ),
                     updatedAt =
-                        item.optString(
-                            "updated_at",
-                            item.optString(
-                                "updatedAt",
-                                null
-                            )
+                        firstNullableString(
+                            item,
+                            "updatedAt",
+                            "updated_at"
                         )
                 )
             )
         }
 
         return Result.success(deposits)
+    }
+
+    suspend fun getGiftHistory(
+        context: Context
+    ): Result<List<JSONObject>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/gifts/history"
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load gift history"
+                )
+            )
+        }
+
+        val array =
+            result.data
+                ?.optJSONArray("items")
+                ?: JSONArray()
+
+        val items =
+            mutableListOf<JSONObject>()
+
+        for (
+            index in 0 until array.length()
+        ) {
+            array.optJSONObject(index)
+                ?.let {
+                    items.add(it)
+                }
+        }
+
+        return Result.success(items)
     }
 
     suspend fun report(
@@ -1473,19 +1907,36 @@ object WaveApi {
         reason: String
     ): Result<String> {
 
+        val cleanReason =
+            reason.trim()
+
+        if (
+            targetType.isBlank() ||
+            targetId.isBlank() ||
+            cleanReason.isBlank()
+        ) {
+            return Result.failure(
+                Exception(
+                    "Report information is incomplete"
+                )
+            )
+        }
+
         val body =
             JSONObject().apply {
                 put(
                     "targetType",
                     targetType
                 )
+
                 put(
                     "targetId",
                     targetId
                 )
+
                 put(
                     "reason",
-                    reason
+                    cleanReason.take(500)
                 )
             }
 
@@ -1507,12 +1958,11 @@ object WaveApi {
         }
 
         return Result.success(
-            result.data
-                ?.optString(
-                    "reportId",
-                    ""
-                )
-                ?: ""
+            firstString(
+                result.data ?: JSONObject(),
+                "reportId",
+                "report_id"
+            )
         )
     }
 
@@ -1536,47 +1986,56 @@ object WaveApi {
 
         return User(
             id = id,
+
             username =
                 json.optString(
                     "username",
                     ""
                 ),
+
             displayName =
-                json.optString(
+                firstString(
+                    json,
                     "displayName",
+                    "display_name"
+                ).ifBlank {
                     json.optString(
-                        "display_name",
+                        "username",
                         ""
                     )
-                ),
+                },
+
             avatar =
-                json.optString(
+                firstNullableString(
+                    json,
                     "avatar",
-                    json.optString(
-                        "avatar_url",
-                        null
-                    )
+                    "avatar_url"
                 ),
+
             bio =
                 json.optString(
                     "bio",
                     null
                 ),
+
             coins =
                 json.optInt(
                     "coins",
                     0
                 ),
+
             followers =
                 json.optInt(
                     "followers",
                     0
                 ),
+
             following =
                 json.optInt(
                     "following",
                     0
                 ),
+
             verified =
                 json.optBoolean(
                     "verified",
@@ -1605,93 +2064,101 @@ object WaveApi {
 
         return Video(
             id = id,
+
             userId =
-                json.optString(
+                firstString(
+                    json,
                     "userId",
-                    json.optString(
-                        "user_id",
-                        ""
-                    )
+                    "user_id"
                 ),
+
             username =
                 json.optString(
                     "username",
                     ""
                 ),
+
             displayName =
-                json.optString(
+                firstString(
+                    json,
                     "displayName",
+                    "display_name"
+                ).ifBlank {
                     json.optString(
-                        "display_name",
+                        "username",
                         ""
                     )
-                ),
+                },
+
             avatar =
-                json.optString(
+                firstNullableString(
+                    json,
                     "avatar",
-                    null
+                    "avatar_url"
                 ),
+
             videoUrl =
-                json.optString(
+                firstString(
+                    json,
                     "videoUrl",
-                    json.optString(
-                        "video_url",
-                        ""
-                    )
+                    "video_url"
                 ),
+
             thumbnailUrl =
-                json.optString(
+                firstNullableString(
+                    json,
                     "thumbnailUrl",
-                    json.optString(
-                        "thumbnail_url",
-                        null
-                    )
+                    "thumbnail_url"
                 ),
+
             caption =
                 json.optString(
                     "caption",
                     ""
                 ),
+
             musicName =
-                json.optString(
+                firstNullableString(
+                    json,
                     "musicName",
-                    json.optString(
-                        "music_name",
-                        null
-                    )
+                    "music_name"
                 ),
+
             likes =
                 json.optInt(
                     "likes",
                     0
                 ),
+
             comments =
                 json.optInt(
                     "comments",
                     0
                 ),
+
             shares =
                 json.optInt(
                     "shares",
                     0
                 ),
+
             views =
                 json.optInt(
                     "views",
                     0
                 ),
+
             liked =
                 json.optBoolean(
                     "liked",
                     false
                 ),
+
             createdAt =
-                json.optString(
+                firstNullableString(
+                    json,
                     "createdAt",
-                    json.optString(
-                        "created_at",
-                        null
-                    )
+                    "created_at"
                 )
         )
     }
@@ -1716,96 +2183,164 @@ object WaveApi {
 
         return Live(
             id = id,
+
             userId =
-                json.optString(
+                firstString(
+                    json,
                     "userId",
-                    json.optString(
-                        "user_id",
-                        ""
-                    )
+                    "user_id"
                 ),
+
             username =
                 json.optString(
                     "username",
                     ""
                 ),
+
             displayName =
-                json.optString(
+                firstString(
+                    json,
                     "displayName",
+                    "display_name"
+                ).ifBlank {
                     json.optString(
-                        "display_name",
+                        "username",
                         ""
                     )
-                ),
+                },
+
             avatar =
-                json.optString(
+                firstNullableString(
+                    json,
                     "avatar",
-                    null
+                    "avatar_url"
                 ),
+
             title =
                 json.optString(
                     "title",
                     ""
                 ),
+
             streamUrl =
-                json.optString(
+                firstNullableString(
+                    json,
                     "streamUrl",
-                    json.optString(
-                        "stream_url",
-                        null
-                    )
+                    "stream_url"
                 ),
+
             playbackUrl =
-                json.optString(
+                firstNullableString(
+                    json,
                     "playbackUrl",
-                    json.optString(
-                        "playback_url",
-                        null
-                    )
+                    "playback_url"
                 ),
+
             rtmpsUrl =
-                json.optString(
+                firstNullableString(
+                    json,
                     "rtmpsUrl",
-                    json.optString(
-                        "rtmps_url",
-                        null
-                    )
+                    "rtmps_url"
                 ),
+
             streamKey =
-                json.optString(
+                firstNullableString(
+                    json,
                     "streamKey",
-                    json.optString(
-                        "stream_key",
-                        null
-                    )
+                    "stream_key"
                 ),
+
             viewerCount =
-                json.optInt(
+                firstInt(
+                    json,
                     "viewerCount",
-                    json.optInt(
-                        "viewer_count",
-                        0
-                    )
+                    "viewer_count"
                 ),
+
             likes =
                 json.optInt(
                     "likes",
                     0
                 ),
+
             status =
                 json.optString(
                     "status",
                     "active"
                 ),
+
             startedAt =
-                json.optString(
+                firstNullableString(
+                    json,
                     "startedAt",
-                    json.optString(
-                        "started_at",
-                        null
-                    )
+                    "started_at"
                 )
         )
+    }
+
+    private fun firstString(
+        json: JSONObject,
+        vararg keys: String
+    ): String {
+
+        for (key in keys) {
+            val value =
+                json.optString(
+                    key,
+                    ""
+                )
+
+            if (value.isNotBlank()) {
+                return value
+            }
+        }
+
+        return ""
+    }
+
+    private fun firstNullableString(
+        json: JSONObject,
+        vararg keys: String
+    ): String? {
+
+        for (key in keys) {
+
+            if (!json.has(key)) {
+                continue
+            }
+
+            val value =
+                json.optString(
+                    key,
+                    ""
+                )
+
+            if (value.isNotBlank()) {
+                return value
+            }
+        }
+
+        return null
+    }
+
+    private fun firstInt(
+        json: JSONObject,
+        vararg keys: String
+    ): Int {
+
+        for (key in keys) {
+
+            if (!json.has(key)) {
+                continue
+            }
+
+            return json.optInt(
+                key,
+                0
+            )
+        }
+
+        return 0
     }
 
     private fun jsonStringList(
@@ -1819,12 +2354,15 @@ object WaveApi {
         val result =
             mutableListOf<String>()
 
-        for (index in 0 until array.length()) {
+        for (
+            index in 0 until array.length()
+        ) {
+
             val value =
                 array.optString(
                     index,
                     ""
-                )
+                ).trim()
 
             if (value.isNotBlank()) {
                 result.add(value)
@@ -1837,6 +2375,7 @@ object WaveApi {
     private fun encodePath(
         value: String
     ): String {
+
         return URLEncoder
             .encode(
                 value,
