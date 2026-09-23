@@ -11,5 +11,5 @@ SESSION_DAYS = "30"
 [[d1_databases]]
 binding = "DB"
 database_name = "vyro-wave-prod"
-database_id = "248e7a00-c27e-45c5-8980-f15736f4ec24"
+database_id = "86fecefb-e347-4f1c-8618-c92ca999cee2"
 migrations_dir = "migrations"
