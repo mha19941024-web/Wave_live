@@ -19,12 +19,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
-      - name: Set up Java 17
-        uses: actions/setup-java@17a2a9e1f4c9e8b1d3f6f0a3b9e5b6a7c8d9e0f1
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
+      - name: Check Java
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "===== JAVA ====="
+          java -version
+
+          JAVA_MAJOR=$(java -version 2>&1 | sed -n 's/.*version "\(.*\)".*/\1/p' | cut -d. -f1)
+
+          if [ "$JAVA_MAJOR" != "17" ]; then
+            echo "ERROR: Java 17 is required."
+            echo "Detected Java major version: $JAVA_MAJOR"
+            exit 1
+          fi
+
+          echo "Java 17 detected successfully."
 
       - name: Check project files
         shell: bash
@@ -56,22 +67,16 @@ jobs:
           done
 
           if [ "$missing" -ne 0 ]; then
-            echo ""
-            echo "Required project files are missing."
             exit 1
           fi
 
           chmod +x gradlew
 
-      - name: Show Java and Gradle versions
+      - name: Check Gradle
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "===== JAVA ====="
-          java -version
-
-          echo ""
           echo "===== GRADLE ====="
           ./gradlew --version
 
