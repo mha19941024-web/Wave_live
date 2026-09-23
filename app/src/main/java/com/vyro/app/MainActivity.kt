@@ -27,7 +27,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -40,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
 
 private val WaveBackground = Color(0xFF08060D)
 private val WaveSurface = Color(0xFF15111D)
@@ -117,16 +116,22 @@ private fun WaveApp() {
     }
 
     LaunchedEffect(loggedIn) {
+
         if (loggedIn) {
+
             val result = WaveApi.me(context)
 
             if (result.isSuccess) {
+
                 currentUser = result.getOrNull()
                 coins = result.getOrNull()?.coins ?: 0
                 showAuth = false
+
             } else {
+
                 loggedIn = false
                 currentUser = null
+                coins = 0
                 showAuth = true
             }
         }
@@ -136,6 +141,7 @@ private fun WaveApp() {
 
         AuthScreen(
             onLoginSuccess = { user ->
+
                 loggedIn = true
                 currentUser = user
                 coins = user?.coins ?: 0
@@ -155,12 +161,13 @@ private fun WaveApp() {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weightSafe(1f)
+                .weight(1f)
         ) {
 
             when (selectedTab) {
 
                 WaveTab.HOME -> {
+
                     HomeScreen(
                         coins = coins,
                         onOpenLogin = {
@@ -170,6 +177,7 @@ private fun WaveApp() {
                 }
 
                 WaveTab.LIVE -> {
+
                     LiveRoomsScreen(
                         onRequireLogin = {
                             showAuth = true
@@ -181,6 +189,7 @@ private fun WaveApp() {
                 }
 
                 WaveTab.CREATE -> {
+
                     CreateScreen(
                         loggedIn = loggedIn,
                         onRequireLogin = {
@@ -194,15 +203,16 @@ private fun WaveApp() {
                 }
 
                 WaveTab.PROFILE -> {
+
                     ProfileScreen(
                         user = currentUser,
                         coins = coins,
-                        onRequireLogin = {
-                            showAuth = true
-                        },
                         onLogout = {
+
                             scope.launch {
+
                                 WaveApi.logout(context)
+
                                 loggedIn = false
                                 currentUser = null
                                 coins = 0
@@ -226,20 +236,9 @@ private fun WaveApp() {
     }
 }
 
-/*
- * Helper بدل Modifier.weight حتى لا نعتمد على استيراد weight
- * الذي تسبب سابقاً في خطأ البناء.
- */
-@Composable
-private fun Modifier.weightSafe(
-    value: Float
-): Modifier {
-    return this.fillMaxSize()
-}
-
-/* --------------------------------------------------------- */
+/* ========================================================= */
 /* HOME */
-/* --------------------------------------------------------- */
+/* ========================================================= */
 
 @Composable
 private fun HomeScreen(
@@ -259,7 +258,7 @@ private fun HomeScreen(
     }
 
     var error by remember {
-        mutableStateOf<String?>(null)
+        mutableStateOf("")
     }
 
     LaunchedEffect(Unit) {
@@ -273,10 +272,15 @@ private fun HomeScreen(
         )
 
         if (result.isSuccess) {
+
             videos = result.getOrNull().orEmpty()
-            error = null
+            error = ""
+
         } else {
-            error = result.exceptionOrNull()?.message
+
+            error =
+                result.exceptionOrNull()?.message
+                    ?: "تعذر تحميل الفيديوهات"
         }
 
         loading = false
@@ -289,20 +293,18 @@ private fun HomeScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(
-                    horizontal = 16.dp,
-                    vertical = 12.dp
-                ),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
 
             Column(
-                modifier = Modifier.weightSafe(1f)
+                modifier = Modifier.weight(1f)
             ) {
+
                 Text(
                     text = "WAVE",
                     color = WaveWhite,
-                    fontSize = 25.sp,
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
 
@@ -313,63 +315,66 @@ private fun HomeScreen(
                 )
             }
 
-            CoinBadge(
-                coins = coins
-            )
+            CoinBadge(coins)
         }
 
-        Divider(
-            color = WaveSurface
-        )
+        when {
 
-        if (loading) {
+            loading -> {
 
-            CenterMessage(
-                title = "جارِ تحميل المحتوى",
-                message = "نتصل بخادم Wave..."
-            )
+                CenterMessage(
+                    "جارِ التحميل",
+                    "نتصل بخادم Wave..."
+                )
+            }
 
-        } else if (error != null) {
+            error.isNotBlank() -> {
 
-            CenterMessage(
-                title = "تعذر تحميل المحتوى",
-                message = error ?: "خطأ غير معروف"
-            )
+                CenterMessage(
+                    "تعذر تحميل المحتوى",
+                    error
+                )
+            }
 
-        } else if (videos.isEmpty()) {
+            videos.isEmpty() -> {
 
-            CenterMessage(
-                title = "لا توجد فيديوهات بعد",
-                message = "ابدأ بنشر أول فيديو على Wave."
-            )
+                CenterMessage(
+                    "لا توجد فيديوهات",
+                    "ابدأ بنشر أول فيديو على Wave."
+                )
+            }
 
-        } else {
+            else -> {
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize()
-            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize()
+                ) {
 
-                items(
-                    items = videos,
-                    key = { it.id }
-                ) { video ->
+                    items(
+                        items = videos,
+                        key = { it.id }
+                    ) { video ->
 
-                    VideoCard(
-                        video = video,
-                        onLike = {
+                        VideoCard(
+                            video = video,
+                            onLike = {
 
-                            if (!WaveApi.isLoggedIn(context)) {
-                                onOpenLogin()
-                            } else {
-                                scope.launch {
-                                    WaveApi.likeVideo(
-                                        context,
-                                        video.id
-                                    )
+                                if (!WaveApi.isLoggedIn(context)) {
+
+                                    onOpenLogin()
+
+                                } else {
+
+                                    scope.launch {
+                                        WaveApi.likeVideo(
+                                            context,
+                                            video.id
+                                        )
+                                    }
                                 }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -395,9 +400,7 @@ private fun VideoCard(
         )
     ) {
 
-        Column(
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Column {
 
             if (video.videoUrl.isNotBlank()) {
 
@@ -422,25 +425,17 @@ private fun VideoCard(
                                 )
 
                             setVideoURI(
-                                Uri.parse(
-                                    video.videoUrl
-                                )
+                                Uri.parse(video.videoUrl)
                             )
 
-                            setOnPreparedListener { player ->
-
-                                player.isLooping = true
-                                player.start()
+                            setOnPreparedListener {
+                                it.isLooping = true
+                                it.start()
                             }
-                        }
-                    },
-                    update = { view ->
-
-                        if (!view.isPlaying) {
-                            view.start()
                         }
                     }
                 )
+
             } else {
 
                 Box(
@@ -469,20 +464,19 @@ private fun VideoCard(
                         "@${video.username}"
                     },
                     color = WaveWhite,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
                 )
 
                 if (video.caption.isNotBlank()) {
 
                     Spacer(
-                        modifier = Modifier.height(5.dp)
+                        modifier = Modifier.height(6.dp)
                     )
 
                     Text(
                         text = video.caption,
                         color = WaveWhite,
-                        fontSize = 14.sp,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -501,14 +495,14 @@ private fun VideoCard(
                     )
                 }
 
-                Spacer(
-                    modifier = Modifier.height(10.dp)
-                )
-
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
                     horizontalArrangement =
-                        Arrangement.SpaceBetween
+                        Arrangement.SpaceBetween,
+                    verticalAlignment =
+                        Alignment.CenterVertically
                 ) {
 
                     TextButton(
@@ -552,9 +546,9 @@ private fun VideoCard(
     }
 }
 
-/* --------------------------------------------------------- */
-/* LIVE ROOMS */
-/* --------------------------------------------------------- */
+/* ========================================================= */
+/* LIVE */
+/* ========================================================= */
 
 @Composable
 private fun LiveRoomsScreen(
@@ -563,18 +557,17 @@ private fun LiveRoomsScreen(
 ) {
 
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     var lives by remember {
         mutableStateOf<List<WaveApi.Live>>(emptyList())
     }
 
-    var selectedLive by remember {
-        mutableStateOf<WaveApi.Live?>(null)
-    }
-
     var gifts by remember {
         mutableStateOf<List<WaveApi.Gift>>(emptyList())
+    }
+
+    var selectedLive by remember {
+        mutableStateOf<WaveApi.Live?>(null)
     }
 
     var loading by remember {
@@ -583,13 +576,12 @@ private fun LiveRoomsScreen(
 
     LaunchedEffect(Unit) {
 
-        loading = true
-
-        val result =
+        val livesResult =
             WaveApi.getLives(context)
 
-        if (result.isSuccess) {
-            lives = result.getOrNull().orEmpty()
+        if (livesResult.isSuccess) {
+            lives =
+                livesResult.getOrNull().orEmpty()
         }
 
         val giftsResult =
@@ -625,42 +617,47 @@ private fun LiveRoomsScreen(
         Text(
             text = "البث المباشر",
             color = WaveWhite,
-            fontSize = 25.sp,
+            fontSize = 26.sp,
             fontWeight = FontWeight.ExtraBold,
             modifier = Modifier.padding(16.dp)
         )
 
-        if (loading) {
+        when {
 
-            CenterMessage(
-                title = "جارِ التحميل",
-                message = "نبحث عن البثوث الحالية..."
-            )
+            loading -> {
 
-        } else if (lives.isEmpty()) {
+                CenterMessage(
+                    "جارِ التحميل",
+                    "نبحث عن البثوث الحالية..."
+                )
+            }
 
-            CenterMessage(
-                title = "لا يوجد بث مباشر الآن",
-                message = "يمكنك بدء بث جديد من تبويب إنشاء."
-            )
+            lives.isEmpty() -> {
 
-        } else {
+                CenterMessage(
+                    "لا يوجد بث مباشر الآن",
+                    "يمكنك بدء بث جديد من تبويب إنشاء."
+                )
+            }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize()
-            ) {
+            else -> {
 
-                items(
-                    items = lives,
-                    key = { it.id }
-                ) { live ->
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize()
+                ) {
 
-                    LiveRoomCard(
-                        live = live,
-                        onClick = {
-                            selectedLive = live
-                        }
-                    )
+                    items(
+                        lives,
+                        key = { it.id }
+                    ) { live ->
+
+                        LiveRoomCard(
+                            live = live,
+                            onClick = {
+                                selectedLive = live
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -694,19 +691,18 @@ private fun LiveRoomCard(
         ) {
 
             Row(
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment =
+                    Alignment.CenterVertically
             ) {
 
-                AvatarCircle(
-                    name = live.displayName
-                )
+                AvatarCircle(live.displayName)
 
                 Spacer(
                     modifier = Modifier.width(12.dp)
                 )
 
                 Column(
-                    modifier = Modifier.weightSafe(1f)
+                    modifier = Modifier.weight(1f)
                 ) {
 
                     Text(
@@ -739,7 +735,7 @@ private fun LiveRoomCard(
             }
 
             Spacer(
-                modifier = Modifier.height(14.dp)
+                modifier = Modifier.height(12.dp)
             )
 
             Text(
@@ -750,22 +746,18 @@ private fun LiveRoomCard(
             )
 
             Spacer(
-                modifier = Modifier.height(8.dp)
+                modifier = Modifier.height(6.dp)
             )
 
             Text(
                 text =
-                    "مشاهدون: ${live.viewerCount}    إعجابات: ${live.likes}",
+                    "مشاهدون: ${live.viewerCount} • إعجابات: ${live.likes}",
                 color = WaveMuted,
                 fontSize = 13.sp
             )
         }
     }
 }
-
-/* --------------------------------------------------------- */
-/* LIVE ROOM */
-/* --------------------------------------------------------- */
 
 @Composable
 private fun LiveRoomScreen(
@@ -779,16 +771,16 @@ private fun LiveRoomScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var message by remember {
-        mutableStateOf("")
-    }
-
     var currentLive by remember {
         mutableStateOf(live)
     }
 
     var showGifts by remember {
         mutableStateOf(false)
+    }
+
+    var message by remember {
+        mutableStateOf("")
     }
 
     Column(
@@ -801,13 +793,15 @@ private fun LiveRoomScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(WaveBackground)
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(10.dp),
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
 
             TextButton(
                 onClick = onBack
             ) {
+
                 Text(
                     text = "رجوع",
                     color = WaveWhite
@@ -815,7 +809,7 @@ private fun LiveRoomScreen(
             }
 
             Column(
-                modifier = Modifier.weightSafe(1f)
+                modifier = Modifier.weight(1f)
             ) {
 
                 Text(
@@ -861,9 +855,9 @@ private fun LiveRoomScreen(
                                 Uri.parse(playback)
                             )
 
-                            setOnPreparedListener { player ->
-                                player.isLooping = true
-                                player.start()
+                            setOnPreparedListener {
+                                it.isLooping = true
+                                it.start()
                             }
                         }
                     }
@@ -871,27 +865,12 @@ private fun LiveRoomScreen(
 
             } else {
 
-                Column(
-                    horizontalAlignment =
-                        Alignment.CenterHorizontally
-                ) {
-
-                    Text(
-                        text = "LIVE",
-                        color = WaveRed,
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-
-                    Spacer(
-                        modifier = Modifier.height(8.dp)
-                    )
-
-                    Text(
-                        text = "البث لم يوفر رابط تشغيل حتى الآن",
-                        color = WaveMuted
-                    )
-                }
+                Text(
+                    text = "LIVE",
+                    color = WaveRed,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
             }
         }
 
@@ -904,7 +883,7 @@ private fun LiveRoomScreen(
 
             Text(
                 text =
-                    "مشاهدون ${currentLive.viewerCount}   •   إعجابات ${currentLive.likes}",
+                    "مشاهدون ${currentLive.viewerCount} • إعجابات ${currentLive.likes}",
                 color = WaveMuted,
                 fontSize = 13.sp
             )
@@ -918,12 +897,15 @@ private fun LiveRoomScreen(
             ) {
 
                 Button(
-                    modifier = Modifier.weightSafe(1f),
+                    modifier = Modifier.weight(1f),
                     onClick = {
 
                         if (!WaveApi.isLoggedIn(context)) {
+
                             onRequireLogin()
+
                         } else {
+
                             scope.launch {
 
                                 val result =
@@ -933,6 +915,7 @@ private fun LiveRoomScreen(
                                     )
 
                                 if (result.isSuccess) {
+
                                     currentLive =
                                         result.getOrNull()
                                             ?: currentLive
@@ -945,9 +928,7 @@ private fun LiveRoomScreen(
                     )
                 ) {
 
-                    Text(
-                        text = "تحديث البث"
-                    )
+                    Text("تحديث")
                 }
 
                 Spacer(
@@ -955,8 +936,9 @@ private fun LiveRoomScreen(
                 )
 
                 Button(
-                    modifier = Modifier.weightSafe(1f),
+                    modifier = Modifier.weight(1f),
                     onClick = {
+
                         if (!WaveApi.isLoggedIn(context)) {
                             onRequireLogin()
                         } else {
@@ -968,22 +950,19 @@ private fun LiveRoomScreen(
                     )
                 ) {
 
-                    Text(
-                        text = "الهدايا"
-                    )
+                    Text("الهدايا")
                 }
             }
 
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
-
             if (message.isNotBlank()) {
+
+                Spacer(
+                    modifier = Modifier.height(10.dp)
+                )
 
                 Text(
                     text = message,
-                    color = WaveGreen,
-                    fontSize = 13.sp
+                    color = WaveGreen
                 )
             }
         }
@@ -1009,15 +988,15 @@ private fun LiveRoomScreen(
 
                     if (result.isSuccess) {
 
-                        val data =
-                            result.getOrNull()
-
                         onCoinsChanged(
-                            data?.remainingCoins ?: 0
+                            result.getOrNull()
+                                ?.remainingCoins
+                                ?: 0
                         )
 
                         message =
                             "تم إرسال ${gift.name}"
+
                     } else {
 
                         message =
@@ -1033,9 +1012,9 @@ private fun LiveRoomScreen(
     }
 }
 
-/* --------------------------------------------------------- */
+/* ========================================================= */
 /* GIFTS */
-/* --------------------------------------------------------- */
+/* ========================================================= */
 
 @Composable
 private fun GiftSheet(
@@ -1057,15 +1036,16 @@ private fun GiftSheet(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment =
+                    Alignment.CenterVertically
             ) {
 
                 Text(
                     text = "هدايا Wave",
                     color = WaveWhite,
-                    fontSize = 22.sp,
+                    fontSize = 23.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weightSafe(1f)
+                    modifier = Modifier.weight(1f)
                 )
 
                 TextButton(
@@ -1079,15 +1059,11 @@ private fun GiftSheet(
                 }
             }
 
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
-
             if (gifts.isEmpty()) {
 
                 CenterMessage(
-                    title = "لا توجد هدايا",
-                    message = "سيتم تحميل الهدايا من الخادم."
+                    "لا توجد هدايا",
+                    "سيتم تحميل الهدايا من الخادم."
                 )
 
             } else {
@@ -1104,17 +1080,13 @@ private fun GiftSheet(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(
-                                    vertical = 5.dp
-                                )
+                                .padding(vertical = 5.dp)
                                 .clickable {
                                     onSend(gift)
                                 },
-                            colors =
-                                CardDefaults.cardColors(
-                                    containerColor =
-                                        WaveSurface
-                                ),
+                            colors = CardDefaults.cardColors(
+                                containerColor = WaveSurface
+                            ),
                             shape =
                                 RoundedCornerShape(16.dp)
                         ) {
@@ -1135,7 +1107,7 @@ private fun GiftSheet(
 
                                 Column(
                                     modifier =
-                                        Modifier.weightSafe(1f)
+                                        Modifier.weight(1f)
                                 ) {
 
                                     Text(
@@ -1168,9 +1140,9 @@ private fun GiftSheet(
     }
 }
 
-/* --------------------------------------------------------- */
+/* ========================================================= */
 /* CREATE */
-/* --------------------------------------------------------- */
+/* ========================================================= */
 
 @Composable
 private fun CreateScreen(
@@ -1197,17 +1169,11 @@ private fun CreateScreen(
         mutableStateOf<List<WaveApi.VisualEffect>>(emptyList())
     }
 
-    var loadingMusic by remember {
-        mutableStateOf(false)
-    }
-
     var message by remember {
         mutableStateOf("")
     }
 
     LaunchedEffect(Unit) {
-
-        loadingMusic = true
 
         val musicResult =
             WaveApi.getMusic(context)
@@ -1224,8 +1190,6 @@ private fun CreateScreen(
             effects =
                 effectsResult.getOrNull().orEmpty()
         }
-
-        loadingMusic = false
     }
 
     if (createdLive != null) {
@@ -1301,18 +1265,27 @@ private fun CreateScreen(
                 onClick = {
 
                     if (!loggedIn) {
+
                         onRequireLogin()
+                        return@Button
+                    }
+
+                    if (title.isBlank()) {
+
+                        message =
+                            "اكتب عنوان البث أولاً"
                         return@Button
                     }
 
                     scope.launch {
 
-                        message = "جارِ إنشاء البث..."
+                        message =
+                            "جارِ إنشاء البث..."
 
                         val result =
                             WaveApi.createLive(
                                 context = context,
-                                title = title
+                                title = title.trim()
                             )
 
                         if (result.isSuccess) {
@@ -1321,6 +1294,7 @@ private fun CreateScreen(
                                 result.getOrNull()
 
                             message = ""
+
                         } else {
 
                             message =
@@ -1335,9 +1309,7 @@ private fun CreateScreen(
                 )
             ) {
 
-                Text(
-                    text = "بدء بث مباشر"
-                )
+                Text("بدء بث مباشر")
             }
 
             if (message.isNotBlank()) {
@@ -1356,32 +1328,20 @@ private fun CreateScreen(
                 modifier = Modifier.height(24.dp)
             )
 
-            SectionTitle(
-                title = "مكتبة الموسيقى"
-            )
+            SectionTitle("مكتبة الموسيقى")
 
-            if (loadingMusic) {
-
-                Text(
-                    text = "جارِ تحميل الموسيقى...",
-                    color = WaveMuted
-                )
-
-            } else if (music.isEmpty()) {
+            if (music.isEmpty()) {
 
                 Text(
                     text =
-                        "لا توجد مقاطع موسيقية منشورة في الخادم حاليًا.",
+                        "لا توجد موسيقى منشورة حاليًا.",
                     color = WaveMuted
                 )
 
             } else {
 
-                music.take(20).forEach { track ->
-
-                    MusicRow(
-                        track = track
-                    )
+                music.take(20).forEach {
+                    MusicRow(it)
                 }
             }
 
@@ -1389,25 +1349,20 @@ private fun CreateScreen(
                 modifier = Modifier.height(20.dp)
             )
 
-            SectionTitle(
-                title = "المؤثرات البصرية"
-            )
+            SectionTitle("المؤثرات البصرية")
 
             if (effects.isEmpty()) {
 
                 Text(
                     text =
-                        "لا توجد مؤثرات منشورة في الخادم حاليًا.",
+                        "لا توجد مؤثرات منشورة حاليًا.",
                     color = WaveMuted
                 )
 
             } else {
 
-                effects.forEach { effect ->
-
-                    EffectRow(
-                        effect = effect
-                    )
+                effects.forEach {
+                    EffectRow(it)
                 }
             }
         }
@@ -1452,7 +1407,7 @@ private fun CreatedLiveScreen(
         )
 
         Spacer(
-            modifier = Modifier.height(20.dp)
+            modifier = Modifier.height(15.dp)
         )
 
         Text(
@@ -1467,8 +1422,8 @@ private fun CreatedLiveScreen(
         if (!live.rtmpsUrl.isNullOrBlank()) {
 
             InfoBox(
-                title = "RTMPS URL",
-                value = live.rtmpsUrl!!
+                "RTMPS URL",
+                live.rtmpsUrl!!
             )
         }
 
@@ -1479,8 +1434,8 @@ private fun CreatedLiveScreen(
         if (!live.streamKey.isNullOrBlank()) {
 
             InfoBox(
-                title = "Stream Key",
-                value = live.streamKey!!
+                "Stream Key",
+                live.streamKey!!
             )
         }
 
@@ -1496,16 +1451,14 @@ private fun CreatedLiveScreen(
             )
         ) {
 
-            Text(
-                text = "إنهاء البث"
-            )
+            Text("إنهاء البث")
         }
     }
 }
 
-/* --------------------------------------------------------- */
+/* ========================================================= */
 /* MUSIC / EFFECTS */
-/* --------------------------------------------------------- */
+/* ========================================================= */
 
 @Composable
 private fun MusicRow(
@@ -1515,9 +1468,7 @@ private fun MusicRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(
-                vertical = 4.dp
-            ),
+            .padding(vertical = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = WaveSurface
         )
@@ -1525,7 +1476,8 @@ private fun MusicRow(
 
         Row(
             modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
 
             Text(
@@ -1539,7 +1491,7 @@ private fun MusicRow(
             )
 
             Column(
-                modifier = Modifier.weightSafe(1f)
+                modifier = Modifier.weight(1f)
             ) {
 
                 Text(
@@ -1556,8 +1508,7 @@ private fun MusicRow(
             }
 
             Text(
-                text =
-                    "${track.durationSeconds}s",
+                text = "${track.durationSeconds}s",
                 color = WaveMuted,
                 fontSize = 11.sp
             )
@@ -1573,9 +1524,7 @@ private fun EffectRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(
-                vertical = 4.dp
-            ),
+            .padding(vertical = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = WaveSurface
         )
@@ -1583,7 +1532,8 @@ private fun EffectRow(
 
         Row(
             modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
 
             Box(
@@ -1607,7 +1557,7 @@ private fun EffectRow(
             )
 
             Column(
-                modifier = Modifier.weightSafe(1f)
+                modifier = Modifier.weight(1f)
             ) {
 
                 Text(
@@ -1617,7 +1567,8 @@ private fun EffectRow(
                 )
 
                 Text(
-                    text = "${effect.type} • ${effect.value}",
+                    text =
+                        "${effect.type} • ${effect.value}",
                     color = WaveMuted,
                     fontSize = 12.sp
                 )
@@ -1626,9 +1577,9 @@ private fun EffectRow(
     }
 }
 
-/* --------------------------------------------------------- */
+/* ========================================================= */
 /* INBOX */
-/* --------------------------------------------------------- */
+/* ========================================================= */
 
 @Composable
 private fun InboxScreen() {
@@ -1675,7 +1626,7 @@ private fun InboxScreen() {
 
                 Text(
                     text =
-                        "سيتم ربط إشعارات المتابعين والهدايا والرسائل هنا مع نظام الإشعارات الخلفي.",
+                        "الإشعارات والهدايا والمتابعون ستظهر هنا.",
                     color = WaveMuted,
                     fontSize = 13.sp
                 )
@@ -1684,15 +1635,14 @@ private fun InboxScreen() {
     }
 }
 
-/* --------------------------------------------------------- */
+/* ========================================================= */
 /* PROFILE */
-/* --------------------------------------------------------- */
+/* ========================================================= */
 
 @Composable
 private fun ProfileScreen(
     user: WaveApi.User?,
     coins: Int,
-    onRequireLogin: () -> Unit,
     onLogout: () -> Unit,
     onCoinsChanged: (Int) -> Unit
 ) {
@@ -1700,8 +1650,8 @@ private fun ProfileScreen(
     if (user == null) {
 
         CenterMessage(
-            title = "الحساب",
-            message = "سجل الدخول للوصول إلى ملفك الشخصي."
+            "الحساب",
+            "سجل الدخول للوصول إلى حسابك."
         )
 
         return
@@ -1730,6 +1680,7 @@ private fun ProfileScreen(
                 WaveApi.getWallet(context)
 
             if (walletResult.isSuccess) {
+
                 wallet =
                     walletResult.getOrNull()
 
@@ -1742,8 +1693,10 @@ private fun ProfileScreen(
                 WaveApi.getWalletDeposits(context)
 
             if (depositsResult.isSuccess) {
+
                 deposits =
-                    depositsResult.getOrNull().orEmpty()
+                    depositsResult.getOrNull()
+                        .orEmpty()
             }
         }
     }
@@ -1779,11 +1732,11 @@ private fun ProfileScreen(
                             val data =
                                 refresh.getOrNull()
 
+                            wallet = data
+
                             onCoinsChanged(
                                 data?.coins ?: coins
                             )
-
-                            wallet = data
                         }
                     }
                 }
@@ -1802,8 +1755,8 @@ private fun ProfileScreen(
         item {
 
             AvatarCircle(
-                name = user.displayName,
-                size = 82.dp
+                user.displayName,
+                82.dp
             )
 
             Spacer(
@@ -1822,11 +1775,11 @@ private fun ProfileScreen(
                 color = WaveMuted
             )
 
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
-
             if (!user.bio.isNullOrBlank()) {
+
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
 
                 Text(
                     text = user.bio!!,
@@ -1845,18 +1798,18 @@ private fun ProfileScreen(
             ) {
 
                 StatBox(
-                    value = user.followers,
-                    label = "المتابعون"
+                    user.followers,
+                    "المتابعون"
                 )
 
                 StatBox(
-                    value = user.following,
-                    label = "يتابع"
+                    user.following,
+                    "يتابع"
                 )
 
                 StatBox(
-                    value = coins,
-                    label = "Coins"
+                    coins,
+                    "Coins"
                 )
             }
 
@@ -1874,9 +1827,7 @@ private fun ProfileScreen(
                 )
             ) {
 
-                Text(
-                    text = "محفظة Wave"
-                )
+                Text("محفظة Wave")
             }
 
             Spacer(
@@ -1895,18 +1846,7 @@ private fun ProfileScreen(
             }
 
             Spacer(
-                modifier = Modifier.height(25.dp)
-            )
-
-            Text(
-                text = "حالة الحساب",
-                color = WaveWhite,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(
-                modifier = Modifier.height(8.dp)
+                modifier = Modifier.height(20.dp)
             )
 
             Text(
@@ -1927,9 +1867,9 @@ private fun ProfileScreen(
     }
 }
 
-/* --------------------------------------------------------- */
+/* ========================================================= */
 /* WALLET */
-/* --------------------------------------------------------- */
+/* ========================================================= */
 
 @Composable
 private fun WalletScreen(
@@ -1949,7 +1889,8 @@ private fun WalletScreen(
 
     var walletNumber by remember {
         mutableStateOf(
-            wallet?.walletNumbers?.firstOrNull()
+            wallet?.walletNumbers
+                ?.firstOrNull()
                 ?: ""
         )
     }
@@ -1971,7 +1912,7 @@ private fun WalletScreen(
             ) {
 
                 Text(
-                    text = "رجوع",
+                    "رجوع",
                     color = WaveWhite
                 )
             }
@@ -1991,8 +1932,7 @@ private fun WalletScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
                     containerColor = WaveSurface
-                ),
-                shape = RoundedCornerShape(20.dp)
+                )
             ) {
 
                 Column(
@@ -2000,13 +1940,12 @@ private fun WalletScreen(
                 ) {
 
                     Text(
-                        text = "الرصيد",
+                        "الرصيد",
                         color = WaveMuted
                     )
 
                     Text(
-                        text =
-                            "${wallet?.coins ?: 0} Coins",
+                        "${wallet?.coins ?: 0} Coins",
                         color = WaveGold,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.ExtraBold
@@ -2018,9 +1957,7 @@ private fun WalletScreen(
                 modifier = Modifier.height(20.dp)
             )
 
-            SectionTitle(
-                title = "إضافة رصيد"
-            )
+            SectionTitle("إضافة رصيد")
 
             Text(
                 text =
@@ -2037,9 +1974,10 @@ private fun WalletScreen(
                 modifier = Modifier.fillMaxWidth(),
                 value = amount,
                 onValueChange = {
-                    amount = it.filter { c ->
-                        c.isDigit()
-                    }
+                    amount =
+                        it.filter { c ->
+                            c.isDigit()
+                        }
                 },
                 label = {
                     Text("المبلغ")
@@ -2111,42 +2049,35 @@ private fun WalletScreen(
                 )
             ) {
 
-                Text(
-                    text = "إرسال طلب الإيداع"
-                )
+                Text("إرسال طلب الإيداع")
             }
 
             Spacer(
                 modifier = Modifier.height(25.dp)
             )
 
-            SectionTitle(
-                title = "طلبات الإيداع"
-            )
+            SectionTitle("طلبات الإيداع")
 
             if (deposits.isEmpty()) {
 
                 Text(
-                    text = "لا توجد عمليات سابقة.",
+                    "لا توجد عمليات سابقة.",
                     color = WaveMuted
                 )
 
             } else {
 
-                deposits.take(20).forEach { deposit ->
-
-                    DepositRow(
-                        deposit = deposit
-                    )
+                deposits.take(20).forEach {
+                    DepositRow(it)
                 }
             }
         }
     }
 }
 
-/* --------------------------------------------------------- */
+/* ========================================================= */
 /* AUTH */
-/* --------------------------------------------------------- */
+/* ========================================================= */
 
 @Composable
 private fun AuthScreen(
@@ -2283,6 +2214,26 @@ private fun AuthScreen(
             enabled = !loading,
             onClick = {
 
+                if (
+                    username.isBlank() ||
+                    password.isBlank()
+                ) {
+
+                    error =
+                        "أدخل اسم المستخدم وكلمة المرور"
+                    return@Button
+                }
+
+                if (
+                    registerMode &&
+                    displayName.isBlank()
+                ) {
+
+                    error =
+                        "أدخل الاسم"
+                    return@Button
+                }
+
                 scope.launch {
 
                     loading = true
@@ -2293,17 +2244,17 @@ private fun AuthScreen(
 
                             WaveApi.register(
                                 context = context,
-                                username = username,
+                                username = username.trim(),
                                 password = password,
                                 displayName =
-                                    displayName
+                                    displayName.trim()
                             )
 
                         } else {
 
                             WaveApi.login(
                                 context = context,
-                                username = username,
+                                username = username.trim(),
                                 password = password
                             )
                         }
@@ -2361,6 +2312,7 @@ private fun AuthScreen(
 
         TextButton(
             onClick = {
+
                 registerMode = !registerMode
                 error = ""
             }
@@ -2379,9 +2331,9 @@ private fun AuthScreen(
     }
 }
 
-/* --------------------------------------------------------- */
-/* BOTTOM NAV */
-/* --------------------------------------------------------- */
+/* ========================================================= */
+/* BOTTOM NAVIGATION */
+/* ========================================================= */
 
 @Composable
 private fun WaveBottomBar(
@@ -2402,54 +2354,44 @@ private fun WaveBottomBar(
     ) {
 
         BottomItem(
-            text = "الرئيسية",
-            short = "H",
-            selected =
-                selected == WaveTab.HOME,
-            onClick = {
-                onSelected(WaveTab.HOME)
-            }
-        )
+            "الرئيسية",
+            "H",
+            selected == WaveTab.HOME
+        ) {
+            onSelected(WaveTab.HOME)
+        }
 
         BottomItem(
-            text = "LIVE",
-            short = "L",
-            selected =
-                selected == WaveTab.LIVE,
-            onClick = {
-                onSelected(WaveTab.LIVE)
-            }
-        )
+            "LIVE",
+            "L",
+            selected == WaveTab.LIVE
+        ) {
+            onSelected(WaveTab.LIVE)
+        }
 
         BottomItem(
-            text = "إنشاء",
-            short = "+",
-            selected =
-                selected == WaveTab.CREATE,
-            onClick = {
-                onSelected(WaveTab.CREATE)
-            }
-        )
+            "إنشاء",
+            "+",
+            selected == WaveTab.CREATE
+        ) {
+            onSelected(WaveTab.CREATE)
+        }
 
         BottomItem(
-            text = "Inbox",
-            short = "M",
-            selected =
-                selected == WaveTab.INBOX,
-            onClick = {
-                onSelected(WaveTab.INBOX)
-            }
-        )
+            "Inbox",
+            "M",
+            selected == WaveTab.INBOX
+        ) {
+            onSelected(WaveTab.INBOX)
+        }
 
         BottomItem(
-            text = "حسابي",
-            short = "P",
-            selected =
-                selected == WaveTab.PROFILE,
-            onClick = {
-                onSelected(WaveTab.PROFILE)
-            }
-        )
+            "حسابي",
+            "P",
+            selected == WaveTab.PROFILE
+        ) {
+            onSelected(WaveTab.PROFILE)
+        }
     }
 }
 
@@ -2499,9 +2441,9 @@ private fun BottomItem(
     }
 }
 
-/* --------------------------------------------------------- */
-/* SMALL UI COMPONENTS */
-/* --------------------------------------------------------- */
+/* ========================================================= */
+/* UI HELPERS */
+/* ========================================================= */
 
 @Composable
 private fun CoinBadge(
@@ -2533,10 +2475,9 @@ private fun CoinBadge(
         )
 
         Text(
-            text = "$coins",
+            text = coins.toString(),
             color = WaveWhite,
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp
+            fontWeight = FontWeight.Bold
         )
     }
 }
@@ -2698,9 +2639,7 @@ private fun DepositRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(
-                vertical = 4.dp
-            ),
+            .padding(vertical = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = WaveSurface
         )
@@ -2713,7 +2652,7 @@ private fun DepositRow(
         ) {
 
             Column(
-                modifier = Modifier.weightSafe(1f)
+                modifier = Modifier.weight(1f)
             ) {
 
                 Text(
@@ -2724,8 +2663,7 @@ private fun DepositRow(
                 )
 
                 Text(
-                    text =
-                        deposit.walletNumber,
+                    text = deposit.walletNumber,
                     color = WaveMuted,
                     fontSize = 11.sp
                 )
