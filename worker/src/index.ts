@@ -3779,19 +3779,25 @@ async function handleRequest(
   }
 
   if (
-path === "/" &&
-method === "GET"
-) {
-return json({
-ok: true,
-name: "Wave Live",
-service: "Wave Server",
-environment:
-env.ENVIRONMENT ?? "production",
-status: "running",
-api: "/api",
-health: "/health"
-});
+    path === "/" &&
+    method === "GET"
+  ) {
+    return json({
+      ok: true,
+      name: "Wave Live",
+      service: "Wave Server",
+      environment:
+        env.ENVIRONMENT ?? "production",
+      status: "running",
+      api: "/api",
+      health: "/health"
+    });
+  }
+
+  return fail(
+    "Not found",
+    404
+  );
 }
 
 /* ------------------------------------------------ */
