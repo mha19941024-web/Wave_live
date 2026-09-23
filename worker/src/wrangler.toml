@@ -1,8 +1,7 @@
-name = "vyro-wave-api"
-
+name = "worker-jolly-band-100e"
 main = "src/index.ts"
-
-compatibility_date = "2026-09-01"
+compatibility_date = "2026-09-23"
+workers_dev = true
 
 [vars]
 ENVIRONMENT = "production"
@@ -11,5 +10,5 @@ SESSION_DAYS = "30"
 [[d1_databases]]
 binding = "DB"
 database_name = "vyro-wave-prod"
-database_id = "REPLACE_WITH_YOUR_REAL_D1_DATABASE_ID"
-migrations_dir = "./migrations"
+database_id = "248e7a00-c27e-45c5-8980-f15736f4ec24"
+migrations_dir = "../migrations"
