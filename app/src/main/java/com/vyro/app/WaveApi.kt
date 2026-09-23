@@ -802,7 +802,7 @@ object WaveApi {
                     type =
                         item.optString(
                             "type",
-                            "filter"
+                            ""
                         ),
                     value =
                         item.optString(
@@ -811,7 +811,7 @@ object WaveApi {
                         )
                 )
             )
-        }
+                    }
 
         return Result.success(effects)
     }
@@ -1052,11 +1052,12 @@ object WaveApi {
         val data =
             result.data
 
-        val live =
-            data?.optJSONObject("live")
-                ?: data?.let {
-                    parseLive(it)
-                }
+        val live: Live? =
+            data?.optJSONObject("live")?.let { liveJson ->
+                parseLive(liveJson)
+            } ?: data?.let { responseJson ->
+                parseLive(responseJson)
+            }
 
         return if (live != null) {
             Result.success(live)
@@ -1068,8 +1069,7 @@ object WaveApi {
             )
         }
     }
-
-    suspend fun getLive(
+        suspend fun getLive(
         context: Context,
         liveId: String
     ): Result<Live> {
@@ -1103,11 +1103,12 @@ object WaveApi {
         val data =
             result.data
 
-        val live =
-            data?.optJSONObject("live")
-                ?: data?.let {
-                    parseLive(it)
-                }
+        val live: Live? =
+            data?.optJSONObject("live")?.let { liveJson ->
+                parseLive(liveJson)
+            } ?: data?.let { responseJson ->
+                parseLive(responseJson)
+            }
 
         return if (live != null) {
             Result.success(live)
@@ -1185,11 +1186,12 @@ object WaveApi {
         val data =
             result.data
 
-        val live =
-            data?.optJSONObject("live")
-                ?: data?.let {
-                    parseLive(it)
-                }
+        val live: Live? =
+            data?.optJSONObject("live")?.let { liveJson ->
+                parseLive(liveJson)
+            } ?: data?.let { responseJson ->
+                parseLive(responseJson)
+            }
 
         return if (live != null) {
             Result.success(live)
@@ -1303,50 +1305,48 @@ object WaveApi {
                             0
                         )
                     ),
-                giftId =
-                    gift?.optString(
-                        "id",
-                        null
-                    ),
-                giftName =
-                    gift?.optString(
-                        "name",
-                        null
-                    ),
-                quantity =
-                    gift?.optInt(
-                        "quantity",
-                        safeQuantity
-                    ) ?: safeQuantity,
-                totalCoins =
-                    gift?.optInt(
-                        "totalCoins",
-                        gift?.optInt(
-                            "total_coins",
-                            0
-                        ) ?: 0
-                    ) ?: 0
+                gift =
+                    gift?.let {
+                        Gift(
+                            id =
+                                it.optString(
+                                    "id",
+                                    giftId
+                                ),
+                            name =
+                                it.optString(
+                                    "name",
+                                    "Gift"
+                                ),
+                            price =
+                                firstInt(
+                                    it,
+                                    "price",
+                                    "price_coins"
+                                ),
+                            icon =
+                                it.optString(
+                                    "icon",
+                                    "🎁"
+                                ),
+                            imageUrl =
+                                firstNullableString(
+                                    it,
+                                    "imageUrl",
+                                    "image_url"
+                                ),
+                            animationUrl =
+                                firstNullableString(
+                                    it,
+                                    "animationUrl",
+                                    "animation_url"
+                                )
+                        )
+                    }
             )
         )
     }
-
-    suspend fun likeVideo(
-        context: Context,
-        videoId: String
-    ): Result<Boolean> {
-
-        if (videoId.isBlank()) {
-            return Result.failure(
-                Exception(
-                    "Video ID is required"
-                )
-            )
-        }
-
-        val result =
-            request(
-                context = context,
-                method = "POST",
+                    method = "POST",
                 path =
                     "/api/videos/" +
                         encodePath(videoId) +
@@ -1947,8 +1947,7 @@ object WaveApi {
                 path = "/api/reports",
                 body = body
             )
-
-        if (!result.success) {
+                    if (!result.success) {
             return Result.failure(
                 Exception(
                     result.error
@@ -2147,6 +2146,7 @@ object WaveApi {
                     "views",
                     0
                 ),
+                            ),
 
             liked =
                 json.optBoolean(
