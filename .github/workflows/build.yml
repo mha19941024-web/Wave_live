@@ -11,11 +11,10 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
@@ -23,19 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          echo "===== JAVA ====="
           java -version
-
-          JAVA_MAJOR=$(java -version 2>&1 | sed -n 's/.*version "\(.*\)".*/\1/p' | cut -d. -f1)
-
-          if [ "$JAVA_MAJOR" != "17" ]; then
-            echo "ERROR: Java 17 is required."
-            echo "Detected Java major version: $JAVA_MAJOR"
-            exit 1
-          fi
-
-          echo "Java 17 detected successfully."
 
       - name: Check project files
         shell: bash
@@ -48,14 +35,12 @@ jobs:
             "gradle.properties"
             "app/build.gradle.kts"
             "app/src/main/AndroidManifest.xml"
-            "gradlew"
-            "gradle/wrapper/gradle-wrapper.jar"
-            "gradle/wrapper/gradle-wrapper.properties"
+            "worker/package.json"
+            "worker/wrangler.toml"
+            "worker/src/index.ts"
           )
 
           missing=0
-
-          echo "===== PROJECT FILE CHECK ====="
 
           for file in "${required_files[@]}"; do
             if [ -f "$file" ]; then
@@ -67,36 +52,40 @@ jobs:
           done
 
           if [ "$missing" -ne 0 ]; then
+            echo "Required files are missing."
             exit 1
           fi
 
-          chmod +x gradlew
-
-      - name: Check Gradle
+      - name: Install Gradle 8.9
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "===== GRADLE ====="
-          ./gradlew --version
+          GRADLE_VERSION="8.9"
+          GRADLE_DIR="$HOME/gradle"
 
-      - name: Clean project
-        shell: bash
-        run: |
-          set -euo pipefail
-          ./gradlew clean --no-daemon
+          mkdir -p "$GRADLE_DIR"
+
+          curl -fL \
+            "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+            -o "$GRADLE_DIR/gradle.zip"
+
+          unzip -q -o \
+            "$GRADLE_DIR/gradle.zip" \
+            -d "$GRADLE_DIR"
+
+          echo "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+
+          "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin/gradle" --version
 
       - name: Build Debug APK
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "===== BUILDING WAVE LIVE ====="
+          echo "===== BUILDING WAVE LIVE APK ====="
 
-          ./gradlew :app:assembleDebug \
-            --stacktrace \
-            --no-daemon \
-            --warning-mode all
+          gradle :app:assembleDebug --stacktrace
 
       - name: Verify APK
         shell: bash
@@ -105,14 +94,12 @@ jobs:
 
           APK="app/build/outputs/apk/debug/app-debug.apk"
 
-          echo "===== VERIFY APK ====="
-
           if [ ! -f "$APK" ]; then
-            echo "ERROR: APK was not generated."
+            echo "APK NOT FOUND: $APK"
             exit 1
           fi
 
-          echo "APK successfully generated:"
+          echo "===== APK CREATED SUCCESSFULLY ====="
           ls -lh "$APK"
 
       - name: Upload Debug APK
@@ -122,3 +109,69 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+
+      - name: Install Worker dependencies
+        working-directory: worker
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          npm install --no-audit --no-fund
+
+      - name: Verify Cloudflare authentication
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "ERROR: CLOUDFLARE_API_TOKEN GitHub Secret is missing."
+            exit 1
+          fi
+
+          echo "===== CLOUDFLARE AUTHENTICATION ====="
+
+          npx wrangler whoami
+
+      - name: Deploy Cloudflare Worker
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "===== DEPLOYING WAVE LIVE WORKER ====="
+
+          npx wrangler deploy
+
+          echo "===== WORKER DEPLOYMENT COMPLETE ====="
+
+      - name: Verify deployed Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          URL="https://worker-jolly-band-100e.mha19941024.workers.dev/health"
+
+          echo "===== CHECKING DEPLOYED WORKER ====="
+
+          STATUS=$(curl -L -s -o /tmp/health.json -w "%{http_code}" "$URL")
+
+          cat /tmp/health.json || true
+
+          echo ""
+
+          if [ "$STATUS" != "200" ]; then
+            echo "Worker health check failed with HTTP $STATUS"
+            exit 1
+          fi
+
+          echo "===== WORKER HEALTH OK ====="
