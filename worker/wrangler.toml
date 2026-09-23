@@ -1,0 +1,15 @@
+name = "worker-jolly-band-100e"
+main = "src/index.ts"
+compatibility_date = "2026-09-23"
+
+workers_dev = true
+
+[vars]
+ENVIRONMENT = "production"
+SESSION_DAYS = "30"
+
+# أضف قاعدة D1 الحالية هنا بعد معرفة database_id الحقيقي
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "wave-live"
+# database_id = "ضع_DATABASE_ID_الحقيقي_هنا"
