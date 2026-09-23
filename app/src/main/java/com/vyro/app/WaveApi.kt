@@ -53,6 +53,15 @@ object WaveApi {
         val animationUrl: String?
     )
 
+    data class GiftSendResult(
+        val transactionId: String?,
+        val remainingCoins: Int,
+        val giftId: String?,
+        val giftName: String?,
+        val quantity: Int,
+        val totalCoins: Int
+    )
+
     data class MusicTrack(
         val id: String,
         val title: String,
@@ -119,15 +128,6 @@ object WaveApi {
         val status: String,
         val createdAt: String?,
         val updatedAt: String?
-    )
-
-    data class GiftSendResult(
-        val transactionId: String?,
-        val remainingCoins: Int,
-        val giftId: String?,
-        val giftName: String?,
-        val quantity: Int,
-        val totalCoins: Int
     )
 
     private fun prefs(context: Context) =
@@ -215,9 +215,7 @@ object WaveApi {
 
             if (authenticated) {
                 getToken(context)
-                    ?.takeIf {
-                        it.isNotBlank()
-                    }
+                    ?.takeIf { it.isNotBlank() }
                     ?.let { token ->
                         connection.setRequestProperty(
                             "Authorization",
@@ -319,6 +317,7 @@ object WaveApi {
                         }
                     }
             )
+
         } catch (e: Exception) {
 
             ApiResult(
@@ -332,6 +331,7 @@ object WaveApi {
                         }
                         ?: "Network error"
             )
+
         } finally {
             connection?.disconnect()
         }
@@ -385,6 +385,7 @@ object WaveApi {
 
         val body =
             JSONObject().apply {
+
                 put(
                     "username",
                     cleanUsername
@@ -395,15 +396,13 @@ object WaveApi {
                     password
                 )
 
-                val cleanDisplayName =
+                val name =
                     displayName.trim()
 
-                if (
-                    cleanDisplayName.isNotEmpty()
-                ) {
+                if (name.isNotEmpty()) {
                     put(
                         "displayName",
-                        cleanDisplayName
+                        name
                     )
                 }
             }
@@ -461,6 +460,7 @@ object WaveApi {
 
         val body =
             JSONObject().apply {
+
                 put(
                     "username",
                     cleanUsername
@@ -534,9 +534,7 @@ object WaveApi {
 
         if (!result.success) {
 
-            if (
-                result.statusCode == 401
-            ) {
+            if (result.statusCode == 401) {
                 clearSession(context)
             }
 
@@ -588,7 +586,6 @@ object WaveApi {
             me(context)
 
         return if (current.isSuccess) {
-
             Result.success(
                 Session(
                     token = token,
@@ -596,9 +593,7 @@ object WaveApi {
                     expiresAt = null
                 )
             )
-
         } else {
-
             clearSession(context)
 
             Result.failure(
@@ -641,20 +636,577 @@ object WaveApi {
             token
         )
 
+        val user =
+            parseUser(
+                json.optJSONObject("user")
+            )
+
+        val expiresAt =
+            if (json.has("expiresAt")) {
+                json.optString(
+                    "expiresAt",
+                    ""
+                ).takeIf {
+                    it.isNotBlank()
+                }
+            } else {
+                null
+            }
+
         return Result.success(
             Session(
                 token = token,
-                user =
-                    parseUser(
-                        json.optJSONObject(
-                            "user"
+                user = user,
+                expiresAt = expiresAt
+            )
+        )
+    }
+
+    suspend fun feed(
+        context: Context
+    ): Result<List<Video>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/feed",
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load feed"
+                )
+            )
+        }
+
+        val array =
+            extractArray(
+                result.data,
+                "items",
+                "videos",
+                "data"
+            )
+
+        val videos =
+            mutableListOf<Video>()
+
+        for (
+            i in 0 until array.length()
+        ) {
+            parseVideo(
+                array.optJSONObject(i)
+            )?.let {
+                videos.add(it)
+            }
+        }
+
+        return Result.success(videos)
+    }
+
+    suspend fun likeVideo(
+        context: Context,
+        videoId: String
+    ): Result<Boolean> {
+
+        if (videoId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Video ID is required"
+                )
+            )
+        }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path =
+                    "/api/videos/" +
+                        encodePath(videoId) +
+                        "/like"
+            )
+
+        return if (result.success) {
+            Result.success(true)
+        } else {
+            Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to like video"
+                )
+            )
+        }
+    }
+
+    suspend fun viewVideo(
+        context: Context,
+        videoId: String
+    ): Result<Boolean> {
+
+        if (videoId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Video ID is required"
+                )
+            )
+        }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path =
+                    "/api/videos/" +
+                        encodePath(videoId) +
+                        "/view",
+                authenticated = false
+            )
+
+        return if (result.success) {
+            Result.success(true)
+        } else {
+            Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to record view"
+                )
+            )
+        }
+    }
+
+    suspend fun getLives(
+        context: Context
+    ): Result<List<Live>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/live",
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load live streams"
+                )
+            )
+        }
+
+        val array =
+            extractArray(
+                result.data,
+                "items",
+                "lives",
+                "data"
+            )
+
+        val lives =
+            mutableListOf<Live>()
+
+        for (
+            i in 0 until array.length()
+        ) {
+            parseLive(
+                array.optJSONObject(i)
+            )?.let {
+                lives.add(it)
+            }
+        }
+
+        return Result.success(lives)
+    }
+
+    suspend fun getLive(
+        context: Context,
+        liveId: String
+    ): Result<Live> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path =
+                    "/api/live/" +
+                        encodePath(liveId),
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load live"
+                )
+            )
+        }
+
+        val live =
+            parseLive(
+                result.data
+                    ?.optJSONObject("live")
+                    ?: result.data
+            )
+
+        return if (live != null) {
+            Result.success(live)
+        } else {
+            Result.failure(
+                Exception(
+                    "Live data missing"
+                )
+            )
+        }
+    }
+
+    suspend fun createLive(
+        context: Context,
+        title: String
+    ): Result<Live> {
+
+        val cleanTitle =
+            title.trim()
+
+        if (cleanTitle.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Live title is required"
+                )
+            )
+        }
+
+        val body =
+            JSONObject().apply {
+                put(
+                    "title",
+                    cleanTitle.take(150)
+                )
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path = "/api/live/create",
+                body = body
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to create live"
+                )
+            )
+        }
+
+        val live =
+            parseLive(
+                result.data
+                    ?.optJSONObject("live")
+                    ?: result.data
+            )
+
+        return if (live != null) {
+            Result.success(live)
+        } else {
+            Result.failure(
+                Exception(
+                    "Live creation response missing"
+                )
+            )
+        }
+    }
+
+    suspend fun updateLive(
+        context: Context,
+        liveId: String,
+        status: String? = null,
+        title: String? = null,
+        viewerCount: Int? = null,
+        likes: Int? = null
+    ): Result<Live> {
+
+        val body =
+            JSONObject().apply {
+
+                status
+                    ?.trim()
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+                    ?.let {
+                        put(
+                            "status",
+                            it
                         )
-                    ),
-                expiresAt =
-                    json.optString(
-                        "expiresAt",
-                        null
+                    }
+
+                title
+                    ?.trim()
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+                    ?.let {
+                        put(
+                            "title",
+                            it.take(150)
+                        )
+                    }
+
+                viewerCount
+                    ?.coerceAtLeast(0)
+                    ?.let {
+                        put(
+                            "viewerCount",
+                            it
+                        )
+                    }
+
+                likes
+                    ?.coerceAtLeast(0)
+                    ?.let {
+                        put(
+                            "likes",
+                            it
+                        )
+                    }
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "PATCH",
+                path =
+                    "/api/live/" +
+                        encodePath(liveId),
+                body = body
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to update live"
+                )
+            )
+        }
+
+        val live =
+            parseLive(
+                result.data
+                    ?.optJSONObject("live")
+                    ?: result.data
+            )
+
+        return if (live != null) {
+            Result.success(live)
+        } else {
+            Result.failure(
+                Exception(
+                    "Updated live data missing"
+                )
+            )
+        }
+    }
+
+    suspend fun getGifts(
+        context: Context
+    ): Result<List<Gift>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path = "/api/gifts",
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load gifts"
+                )
+            )
+        }
+
+        val array =
+            extractArray(
+                result.data,
+                "items",
+                "gifts",
+                "data"
+            )
+
+        val gifts =
+            mutableListOf<Gift>()
+
+        for (
+            i in 0 until array.length()
+        ) {
+
+            val item =
+                array.optJSONObject(i)
+                    ?: continue
+
+            val id =
+                item.optString(
+                    "id",
+                    ""
+                )
+
+            if (id.isBlank()) {
+                continue
+            }
+
+            gifts.add(
+                Gift(
+                    id = id,
+                    name =
+                        item.optString(
+                            "name",
+                            ""
+                        ),
+                    price =
+                        item.optInt(
+                            "price",
+                            0
+                        ),
+                    icon =
+                        item.optString(
+                            "icon",
+                            ""
+                        ),
+                    imageUrl =
+                        firstNullableString(
+                            item,
+                            "imageUrl",
+                            "image_url"
+                        ),
+                    animationUrl =
+                        firstNullableString(
+                            item,
+                            "animationUrl",
+                            "animation_url"
+                        )
+                )
+            )
+        }
+
+        return Result.success(gifts)
+    }
+
+    suspend fun sendGift(
+        context: Context,
+        liveId: String,
+        giftId: String,
+        quantity: Int = 1
+    ): Result<GiftSendResult> {
+
+        if (liveId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Live ID is required"
+                )
+            )
+        }
+
+        if (giftId.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Gift ID is required"
+                )
+            )
+        }
+
+        val safeQuantity =
+            quantity.coerceIn(1, 100)
+
+        val body =
+            JSONObject().apply {
+
+                put(
+                    "giftId",
+                    giftId
+                )
+
+                put(
+                    "quantity",
+                    safeQuantity
+                )
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path =
+                    "/api/live/" +
+                        encodePath(liveId) +
+                        "/gifts",
+                body = body
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to send gift"
+                )
+            )
+        }
+
+        val data =
+            result.data
+                ?: return Result.failure(
+                    Exception(
+                        "Gift response missing"
                     )
+                )
+
+        val gift =
+            data.optJSONObject("gift")
+
+        return Result.success(
+            GiftSendResult(
+                transactionId =
+                    firstNullableString(
+                        data,
+                        "transactionId",
+                        "transaction_id"
+                    ),
+                remainingCoins =
+                    data.optInt(
+                        "remainingCoins",
+                        0
+                    ),
+                giftId =
+                    firstNullableString(
+                        gift ?: JSONObject(),
+                        "id"
+                    ),
+                giftName =
+                    firstNullableString(
+                        gift ?: JSONObject(),
+                        "name"
+                    ),
+                quantity =
+                    gift?.optInt(
+                        "quantity",
+                        safeQuantity
+                    ) ?: safeQuantity,
+                totalCoins =
+                    gift?.optInt(
+                        "totalCoins",
+                        0
+                    ) ?: 0
             )
         )
     }
@@ -681,19 +1233,23 @@ object WaveApi {
         }
 
         val array =
-            result.data
-                ?.optJSONArray("items")
-                ?: JSONArray()
+            extractArray(
+                result.data,
+                "items",
+                "tracks",
+                "music",
+                "data"
+            )
 
         val tracks =
             mutableListOf<MusicTrack>()
 
         for (
-            index in 0 until array.length()
+            i in 0 until array.length()
         ) {
 
             val item =
-                array.optJSONObject(index)
+                array.optJSONObject(i)
                     ?: continue
 
             val id =
@@ -766,19 +1322,22 @@ object WaveApi {
         }
 
         val array =
-            result.data
-                ?.optJSONArray("items")
-                ?: JSONArray()
+            extractArray(
+                result.data,
+                "items",
+                "effects",
+                "data"
+            )
 
         val effects =
             mutableListOf<VisualEffect>()
 
         for (
-            index in 0 until array.length()
+            i in 0 until array.length()
         ) {
 
             val item =
-                array.optJSONObject(index)
+                array.optJSONObject(i)
                     ?: continue
 
             val id =
@@ -811,704 +1370,9 @@ object WaveApi {
                         )
                 )
             )
-                    }
+        }
 
         return Result.success(effects)
-    }
-
-    suspend fun getGifts(
-        context: Context
-    ): Result<List<Gift>> {
-
-        val result =
-            request(
-                context = context,
-                method = "GET",
-                path = "/api/gifts"
-            )
-
-        if (!result.success) {
-            return Result.failure(
-                Exception(
-                    result.error
-                        ?: "Unable to load gifts"
-                )
-            )
-        }
-
-        val array =
-            result.data
-                ?.optJSONArray("items")
-                ?: JSONArray()
-
-        val gifts =
-            mutableListOf<Gift>()
-
-        for (
-            index in 0 until array.length()
-        ) {
-
-            val item =
-                array.optJSONObject(index)
-                    ?: continue
-
-            val id =
-                item.optString(
-                    "id",
-                    ""
-                )
-
-            if (id.isBlank()) {
-                continue
-            }
-
-            gifts.add(
-                Gift(
-                    id = id,
-                    name =
-                        item.optString(
-                            "name",
-                            "Gift"
-                        ),
-                    price =
-                        firstInt(
-                            item,
-                            "price",
-                            "price_coins"
-                        ),
-                    icon =
-                        item.optString(
-                            "icon",
-                            "🎁"
-                        ),
-                    imageUrl =
-                        firstNullableString(
-                            item,
-                            "imageUrl",
-                            "image_url"
-                        ),
-                    animationUrl =
-                        firstNullableString(
-                            item,
-                            "animationUrl",
-                            "animation_url"
-                        )
-                )
-            )
-        }
-
-        return Result.success(gifts)
-    }
-
-    /*
-     * IMPORTANT:
-     * Worker /api/feed uses:
-     *   limit
-     *   offset
-     *
-     * It does NOT use cursor.
-     */
-    suspend fun feed(
-        context: Context,
-        limit: Int = 20,
-        cursor: Int = 0
-    ): Result<List<Video>> {
-
-        val safeLimit =
-            limit.coerceIn(
-                1,
-                50
-            )
-
-        val safeOffset =
-            cursor.coerceAtLeast(0)
-
-        val result =
-            request(
-                context = context,
-                method = "GET",
-                path =
-                    "/api/feed" +
-                        "?limit=" +
-                        safeLimit +
-                        "&offset=" +
-                        safeOffset
-            )
-
-        if (!result.success) {
-            return Result.failure(
-                Exception(
-                    result.error
-                        ?: "Unable to load feed"
-                )
-            )
-        }
-
-        val array =
-            result.data
-                ?.optJSONArray("items")
-                ?: JSONArray()
-
-        val videos =
-            mutableListOf<Video>()
-
-        for (
-            index in 0 until array.length()
-        ) {
-
-            parseVideo(
-                array.optJSONObject(index)
-            )?.let {
-                videos.add(it)
-            }
-        }
-
-        return Result.success(videos)
-    }
-
-    suspend fun getLives(
-        context: Context
-    ): Result<List<Live>> {
-
-        val result =
-            request(
-                context = context,
-                method = "GET",
-                path = "/api/live"
-            )
-
-        if (!result.success) {
-            return Result.failure(
-                Exception(
-                    result.error
-                        ?: "Unable to load live rooms"
-                )
-            )
-        }
-
-        val array =
-            result.data
-                ?.optJSONArray("items")
-                ?: JSONArray()
-
-        val lives =
-            mutableListOf<Live>()
-
-        for (
-            index in 0 until array.length()
-        ) {
-
-            parseLive(
-                array.optJSONObject(index)
-            )?.let {
-                lives.add(it)
-            }
-        }
-
-        return Result.success(lives)
-    }
-
-    suspend fun createLive(
-        context: Context,
-        title: String
-    ): Result<Live> {
-
-        val cleanTitle =
-            title.trim()
-
-        if (cleanTitle.isBlank()) {
-            return Result.failure(
-                Exception(
-                    "Live title is required"
-                )
-            )
-        }
-
-        val body =
-            JSONObject().apply {
-                put(
-                    "title",
-                    cleanTitle
-                )
-            }
-
-        val result =
-            request(
-                context = context,
-                method = "POST",
-                path = "/api/live/create",
-                body = body
-            )
-
-        if (!result.success) {
-            return Result.failure(
-                Exception(
-                    result.error
-                        ?: "Unable to create live"
-                )
-            )
-        }
-
-        val data =
-            result.data
-
-        val live: Live? =
-            data?.optJSONObject("live")?.let { liveJson ->
-                parseLive(liveJson)
-            } ?: data?.let { responseJson ->
-                parseLive(responseJson)
-            }
-
-        return if (live != null) {
-            Result.success(live)
-        } else {
-            Result.failure(
-                Exception(
-                    "Live data missing"
-                )
-            )
-        }
-    }
-        suspend fun getLive(
-        context: Context,
-        liveId: String
-    ): Result<Live> {
-
-        if (liveId.isBlank()) {
-            return Result.failure(
-                Exception(
-                    "Live ID is required"
-                )
-            )
-        }
-
-        val result =
-            request(
-                context = context,
-                method = "GET",
-                path =
-                    "/api/live/" +
-                        encodePath(liveId)
-            )
-
-        if (!result.success) {
-            return Result.failure(
-                Exception(
-                    result.error
-                        ?: "Unable to load live"
-                )
-            )
-        }
-
-        val data =
-            result.data
-
-        val live: Live? =
-            data?.optJSONObject("live")?.let { liveJson ->
-                parseLive(liveJson)
-            } ?: data?.let { responseJson ->
-                parseLive(responseJson)
-            }
-
-        return if (live != null) {
-            Result.success(live)
-        } else {
-            Result.failure(
-                Exception(
-                    "Live data missing"
-                )
-            )
-        }
-    }
-
-    suspend fun updateLive(
-        context: Context,
-        liveId: String,
-        status: String? = null,
-        title: String? = null
-    ): Result<Live> {
-
-        if (liveId.isBlank()) {
-            return Result.failure(
-                Exception(
-                    "Live ID is required"
-                )
-            )
-        }
-
-        if (
-            status == null &&
-            title == null
-        ) {
-            return Result.failure(
-                Exception(
-                    "Nothing to update"
-                )
-            )
-        }
-
-        val body =
-            JSONObject()
-
-        if (status != null) {
-            body.put(
-                "status",
-                status
-            )
-        }
-
-        if (title != null) {
-            body.put(
-                "title",
-                title.trim()
-            )
-        }
-
-        val result =
-            request(
-                context = context,
-                method = "PATCH",
-                path =
-                    "/api/live/" +
-                        encodePath(liveId),
-                body = body
-            )
-
-        if (!result.success) {
-            return Result.failure(
-                Exception(
-                    result.error
-                        ?: "Unable to update live"
-                )
-            )
-        }
-
-        val data =
-            result.data
-
-        val live: Live? =
-            data?.optJSONObject("live")?.let { liveJson ->
-                parseLive(liveJson)
-            } ?: data?.let { responseJson ->
-                parseLive(responseJson)
-            }
-
-        return if (live != null) {
-            Result.success(live)
-        } else {
-            Result.failure(
-                Exception(
-                    "Live data missing"
-                )
-            )
-        }
-    }
-
-    suspend fun sendGift(
-        context: Context,
-        liveId: String,
-        giftId: String,
-        quantity: Int = 1,
-        receiverUserId: String? = null
-    ): Result<GiftSendResult> {
-
-        if (liveId.isBlank()) {
-            return Result.failure(
-                Exception(
-                    "Live ID is required"
-                )
-            )
-        }
-
-        if (giftId.isBlank()) {
-            return Result.failure(
-                Exception(
-                    "Gift ID is required"
-                )
-            )
-        }
-
-        val safeQuantity =
-            quantity.coerceIn(
-                1,
-                100
-            )
-
-        val body =
-            JSONObject().apply {
-
-                put(
-                    "giftId",
-                    giftId
-                )
-
-                put(
-                    "quantity",
-                    safeQuantity
-                )
-
-                if (
-                    !receiverUserId
-                        .isNullOrBlank()
-                ) {
-                    put(
-                        "receiverUserId",
-                        receiverUserId
-                    )
-                }
-            }
-
-        val result =
-            request(
-                context = context,
-                method = "POST",
-                path =
-                    "/api/live/" +
-                        encodePath(liveId) +
-                        "/gifts",
-                body = body
-            )
-
-        if (!result.success) {
-            return Result.failure(
-                Exception(
-                    result.error
-                        ?: "Unable to send gift"
-                )
-            )
-        }
-
-        val data =
-            result.data
-                ?: return Result.failure(
-                    Exception(
-                        "Gift response missing"
-                    )
-                )
-
-        val gift =
-            data.optJSONObject("gift")
-
-        return Result.success(
-            GiftSendResult(
-                transactionId =
-                    firstNullableString(
-                        data,
-                        "transactionId",
-                        "transaction_id"
-                    ),
-                remainingCoins =
-                    data.optInt(
-                        "remainingCoins",
-                        data.optInt(
-                            "remaining_coins",
-                            0
-                        )
-                    ),
-                gift =
-                    gift?.let {
-                        Gift(
-                            id =
-                                it.optString(
-                                    "id",
-                                    giftId
-                                ),
-                            name =
-                                it.optString(
-                                    "name",
-                                    "Gift"
-                                ),
-                            price =
-                                firstInt(
-                                    it,
-                                    "price",
-                                    "price_coins"
-                                ),
-                            icon =
-                                it.optString(
-                                    "icon",
-                                    "🎁"
-                                ),
-                            imageUrl =
-                                firstNullableString(
-                                    it,
-                                    "imageUrl",
-                                    "image_url"
-                                ),
-                            animationUrl =
-                                firstNullableString(
-                                    it,
-                                    "animationUrl",
-                                    "animation_url"
-                                )
-                        )
-                    }
-            )
-        )
-    }
-                    method = "POST",
-                path =
-                    "/api/videos/" +
-                        encodePath(videoId) +
-                        "/like"
-            )
-
-        return if (result.success) {
-            Result.success(true)
-        } else {
-            Result.failure(
-                Exception(
-                    result.error
-                        ?: "Unable to like video"
-                )
-            )
-        }
-    }
-
-    suspend fun viewVideo(
-        context: Context,
-        videoId: String
-    ): Result<Boolean> {
-
-        if (videoId.isBlank()) {
-            return Result.failure(
-                Exception(
-                    "Video ID is required"
-                )
-            )
-        }
-
-        val result =
-            request(
-                context = context,
-                method = "POST",
-                path =
-                    "/api/videos/" +
-                        encodePath(videoId) +
-                        "/view"
-            )
-
-        return if (result.success) {
-            Result.success(true)
-        } else {
-            Result.failure(
-                Exception(
-                    result.error
-                        ?: "Unable to register view"
-                )
-            )
-        }
-    }
-
-    suspend fun getComments(
-        context: Context,
-        videoId: String
-    ): Result<List<JSONObject>> {
-
-        if (videoId.isBlank()) {
-            return Result.failure(
-                Exception(
-                    "Video ID is required"
-                )
-            )
-        }
-
-        val result =
-            request(
-                context = context,
-                method = "GET",
-                path =
-                    "/api/videos/" +
-                        encodePath(videoId) +
-                        "/comments"
-            )
-
-        if (!result.success) {
-            return Result.failure(
-                Exception(
-                    result.error
-                        ?: "Unable to load comments"
-                )
-            )
-        }
-
-        val array =
-            result.data
-                ?.optJSONArray("items")
-                ?: JSONArray()
-
-        val comments =
-            mutableListOf<JSONObject>()
-
-        for (
-            index in 0 until array.length()
-        ) {
-            array.optJSONObject(index)
-                ?.let {
-                    comments.add(it)
-                }
-        }
-
-        return Result.success(comments)
-    }
-
-    suspend fun addComment(
-        context: Context,
-        videoId: String,
-        text: String
-    ): Result<JSONObject> {
-
-        if (videoId.isBlank()) {
-            return Result.failure(
-                Exception(
-                    "Video ID is required"
-                )
-            )
-        }
-
-        val cleanText =
-            text.trim()
-
-        if (cleanText.isBlank()) {
-            return Result.failure(
-                Exception(
-                    "Comment cannot be empty"
-                )
-            )
-        }
-
-        val body =
-            JSONObject().apply {
-                put(
-                    "text",
-                    cleanText.take(500)
-                )
-            }
-
-        val result =
-            request(
-                context = context,
-                method = "POST",
-                path =
-                    "/api/videos/" +
-                        encodePath(videoId) +
-                        "/comments",
-                body = body
-            )
-
-        if (!result.success) {
-            return Result.failure(
-                Exception(
-                    result.error
-                        ?: "Unable to add comment"
-                )
-            )
-        }
-
-        return Result.success(
-            result.data
-                ?: JSONObject()
-        )
     }
 
     suspend fun getUser(
@@ -1530,7 +1394,8 @@ object WaveApi {
                 method = "GET",
                 path =
                     "/api/users/" +
-                        encodePath(userId)
+                        encodePath(userId),
+                authenticated = false
             )
 
         if (!result.success) {
@@ -1593,6 +1458,104 @@ object WaveApi {
                 )
             )
         }
+    }
+
+    suspend fun getComments(
+        context: Context,
+        videoId: String
+    ): Result<List<JSONObject>> {
+
+        val result =
+            request(
+                context = context,
+                method = "GET",
+                path =
+                    "/api/videos/" +
+                        encodePath(videoId) +
+                        "/comments",
+                authenticated = false
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to load comments"
+                )
+            )
+        }
+
+        val array =
+            extractArray(
+                result.data,
+                "items",
+                "comments",
+                "data"
+            )
+
+        val items =
+            mutableListOf<JSONObject>()
+
+        for (
+            i in 0 until array.length()
+        ) {
+            array.optJSONObject(i)
+                ?.let {
+                    items.add(it)
+                }
+        }
+
+        return Result.success(items)
+    }
+
+    suspend fun addComment(
+        context: Context,
+        videoId: String,
+        text: String
+    ): Result<JSONObject> {
+
+        val cleanText =
+            text.trim()
+
+        if (cleanText.isBlank()) {
+            return Result.failure(
+                Exception(
+                    "Comment cannot be empty"
+                )
+            )
+        }
+
+        val body =
+            JSONObject().apply {
+                put(
+                    "text",
+                    cleanText.take(500)
+                )
+            }
+
+        val result =
+            request(
+                context = context,
+                method = "POST",
+                path =
+                    "/api/videos/" +
+                        encodePath(videoId) +
+                        "/comments",
+                body = body
+            )
+
+        if (!result.success) {
+            return Result.failure(
+                Exception(
+                    result.error
+                        ?: "Unable to add comment"
+                )
+            )
+        }
+
+        return Result.success(
+            result.data ?: JSONObject()
+        )
     }
 
     suspend fun getWallet(
@@ -1669,6 +1632,21 @@ object WaveApi {
             )
         }
 
+        val reference =
+            transactionReference
+                ?.trim()
+                ?.takeIf {
+                    it.isNotBlank()
+                }
+
+        if (reference == null) {
+            return Result.failure(
+                Exception(
+                    "Transaction reference is required"
+                )
+            )
+        }
+
         val body =
             JSONObject().apply {
 
@@ -1682,15 +1660,10 @@ object WaveApi {
                     walletNumber
                 )
 
-                if (
-                    !transactionReference
-                        .isNullOrBlank()
-                ) {
-                    put(
-                        "transactionReference",
-                        transactionReference.trim()
-                    )
-                }
+                put(
+                    "transactionReference",
+                    reference
+                )
             }
 
         val result =
@@ -1724,7 +1697,8 @@ object WaveApi {
                     firstString(
                         data,
                         "depositId",
-                        "deposit_id"
+                        "deposit_id",
+                        "id"
                     ),
                 amount =
                     data.optInt(
@@ -1744,7 +1718,7 @@ object WaveApi {
                         data,
                         "transactionReference",
                         "transaction_reference"
-                    ) ?: transactionReference,
+                    ) ?: reference,
                 coins =
                     data.optInt(
                         "coins",
@@ -1792,19 +1766,22 @@ object WaveApi {
         }
 
         val array =
-            result.data
-                ?.optJSONArray("items")
-                ?: JSONArray()
+            extractArray(
+                result.data,
+                "items",
+                "deposits",
+                "data"
+            )
 
         val deposits =
             mutableListOf<Deposit>()
 
         for (
-            index in 0 until array.length()
+            i in 0 until array.length()
         ) {
 
             val item =
-                array.optJSONObject(index)
+                array.optJSONObject(i)
                     ?: continue
 
             deposits.add(
@@ -1881,17 +1858,20 @@ object WaveApi {
         }
 
         val array =
-            result.data
-                ?.optJSONArray("items")
-                ?: JSONArray()
+            extractArray(
+                result.data,
+                "items",
+                "history",
+                "data"
+            )
 
         val items =
             mutableListOf<JSONObject>()
 
         for (
-            index in 0 until array.length()
+            i in 0 until array.length()
         ) {
-            array.optJSONObject(index)
+            array.optJSONObject(i)
                 ?.let {
                     items.add(it)
                 }
@@ -1907,12 +1887,18 @@ object WaveApi {
         reason: String
     ): Result<String> {
 
+        val cleanType =
+            targetType.trim()
+
+        val cleanId =
+            targetId.trim()
+
         val cleanReason =
             reason.trim()
 
         if (
-            targetType.isBlank() ||
-            targetId.isBlank() ||
+            cleanType.isBlank() ||
+            cleanId.isBlank() ||
             cleanReason.isBlank()
         ) {
             return Result.failure(
@@ -1924,14 +1910,15 @@ object WaveApi {
 
         val body =
             JSONObject().apply {
+
                 put(
                     "targetType",
-                    targetType
+                    cleanType
                 )
 
                 put(
                     "targetId",
-                    targetId
+                    cleanId
                 )
 
                 put(
@@ -1947,7 +1934,8 @@ object WaveApi {
                 path = "/api/reports",
                 body = body
             )
-                    if (!result.success) {
+
+        if (!result.success) {
             return Result.failure(
                 Exception(
                     result.error
@@ -1960,7 +1948,8 @@ object WaveApi {
             firstString(
                 result.data ?: JSONObject(),
                 "reportId",
-                "report_id"
+                "report_id",
+                "id"
             )
         )
     }
@@ -1985,13 +1974,11 @@ object WaveApi {
 
         return User(
             id = id,
-
             username =
                 json.optString(
                     "username",
                     ""
                 ),
-
             displayName =
                 firstString(
                     json,
@@ -2003,38 +1990,32 @@ object WaveApi {
                         ""
                     )
                 },
-
             avatar =
                 firstNullableString(
                     json,
                     "avatar",
                     "avatar_url"
                 ),
-
             bio =
-                json.optString(
-                    "bio",
-                    null
+                firstNullableString(
+                    json,
+                    "bio"
                 ),
-
             coins =
                 json.optInt(
                     "coins",
                     0
                 ),
-
             followers =
                 json.optInt(
                     "followers",
                     0
                 ),
-
             following =
                 json.optInt(
                     "following",
                     0
                 ),
-
             verified =
                 json.optBoolean(
                     "verified",
@@ -2063,20 +2044,17 @@ object WaveApi {
 
         return Video(
             id = id,
-
             userId =
                 firstString(
                     json,
                     "userId",
                     "user_id"
                 ),
-
             username =
                 json.optString(
                     "username",
                     ""
                 ),
-
             displayName =
                 firstString(
                     json,
@@ -2088,72 +2066,60 @@ object WaveApi {
                         ""
                     )
                 },
-
             avatar =
                 firstNullableString(
                     json,
                     "avatar",
                     "avatar_url"
                 ),
-
             videoUrl =
                 firstString(
                     json,
                     "videoUrl",
                     "video_url"
                 ),
-
             thumbnailUrl =
                 firstNullableString(
                     json,
                     "thumbnailUrl",
                     "thumbnail_url"
                 ),
-
             caption =
                 json.optString(
                     "caption",
                     ""
                 ),
-
             musicName =
                 firstNullableString(
                     json,
                     "musicName",
                     "music_name"
                 ),
-
             likes =
                 json.optInt(
                     "likes",
                     0
                 ),
-
             comments =
                 json.optInt(
                     "comments",
                     0
                 ),
-
             shares =
                 json.optInt(
                     "shares",
                     0
                 ),
-
             views =
                 json.optInt(
                     "views",
                     0
                 ),
-                            ),
-
             liked =
                 json.optBoolean(
                     "liked",
                     false
                 ),
-
             createdAt =
                 firstNullableString(
                     json,
@@ -2183,20 +2149,17 @@ object WaveApi {
 
         return Live(
             id = id,
-
             userId =
                 firstString(
                     json,
                     "userId",
                     "user_id"
                 ),
-
             username =
                 json.optString(
                     "username",
                     ""
                 ),
-
             displayName =
                 firstString(
                     json,
@@ -2208,67 +2171,57 @@ object WaveApi {
                         ""
                     )
                 },
-
             avatar =
                 firstNullableString(
                     json,
                     "avatar",
                     "avatar_url"
                 ),
-
             title =
                 json.optString(
                     "title",
                     ""
                 ),
-
             streamUrl =
                 firstNullableString(
                     json,
                     "streamUrl",
                     "stream_url"
                 ),
-
             playbackUrl =
                 firstNullableString(
                     json,
                     "playbackUrl",
                     "playback_url"
                 ),
-
             rtmpsUrl =
                 firstNullableString(
                     json,
                     "rtmpsUrl",
                     "rtmps_url"
                 ),
-
             streamKey =
                 firstNullableString(
                     json,
                     "streamKey",
                     "stream_key"
                 ),
-
             viewerCount =
                 firstInt(
                     json,
                     "viewerCount",
                     "viewer_count"
                 ),
-
             likes =
                 json.optInt(
                     "likes",
                     0
                 ),
-
             status =
                 json.optString(
                     "status",
                     "active"
                 ),
-
             startedAt =
                 firstNullableString(
                     json,
@@ -2278,12 +2231,34 @@ object WaveApi {
         )
     }
 
+    private fun extractArray(
+        json: JSONObject?,
+        vararg keys: String
+    ): JSONArray {
+
+        if (json == null) {
+            return JSONArray()
+        }
+
+        for (key in keys) {
+            val array =
+                json.optJSONArray(key)
+
+            if (array != null) {
+                return array
+            }
+        }
+
+        return JSONArray()
+    }
+
     private fun firstString(
         json: JSONObject,
         vararg keys: String
     ): String {
 
         for (key in keys) {
+
             val value =
                 json.optString(
                     key,
@@ -2355,12 +2330,12 @@ object WaveApi {
             mutableListOf<String>()
 
         for (
-            index in 0 until array.length()
+            i in 0 until array.length()
         ) {
 
             val value =
                 array.optString(
-                    index,
+                    i,
                     ""
                 ).trim()
 
