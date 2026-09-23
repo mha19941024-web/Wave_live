@@ -1,177 +1,204 @@
 name: Build Wave Live
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
+workflow_dispatch:
+push:
+branches:
+- main
 
 permissions:
-  contents: read
+contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+build:
+runs-on: ubuntu-latest
 
-    steps:
+steps:
 
-      - name: Checkout repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+  - name: Checkout repository
+    uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
-      - name: Check Java
-        shell: bash
-        run: |
-          set -euo pipefail
-          java -version
+  - name: Check Java
+    shell: bash
+    run: |
+      set -euo pipefail
+      java -version
 
-      - name: Check project files
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Check project files
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          required_files=(
-            "settings.gradle.kts"
-            "build.gradle.kts"
-            "gradle.properties"
-            "app/build.gradle.kts"
-            "app/src/main/AndroidManifest.xml"
-            "worker/package.json"
-            "worker/wrangler.toml"
-            "worker/src/index.ts"
-          )
+      required_files=(
+        "settings.gradle.kts"
+        "build.gradle.kts"
+        "gradle.properties"
+        "app/build.gradle.kts"
+        "app/src/main/AndroidManifest.xml"
+        "worker/package.json"
+        "worker/wrangler.toml"
+        "worker/src/index.ts"
+        "worker/migrations"
+      )
 
-          missing=0
+      missing=0
 
-          for file in "${required_files[@]}"; do
-            if [ -f "$file" ]; then
-              echo "OK      $file"
-            else
-              echo "MISSING $file"
-              missing=1
-            fi
-          done
+      for file in "${required_files[@]}"; do
+        if [ -e "$file" ]; then
+          echo "OK      $file"
+        else
+          echo "MISSING $file"
+          missing=1
+        fi
+      done
 
-          if [ "$missing" -ne 0 ]; then
-            echo "Required files are missing."
-            exit 1
-          fi
+      if [ "$missing" -ne 0 ]; then
+        echo "Required project files are missing."
+        exit 1
+      fi
 
-      - name: Install Gradle 8.9
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Install Gradle 8.9
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          GRADLE_VERSION="8.9"
-          GRADLE_DIR="$HOME/gradle"
+      GRADLE_VERSION="8.9"
+      GRADLE_DIR="$HOME/gradle"
 
-          mkdir -p "$GRADLE_DIR"
+      mkdir -p "$GRADLE_DIR"
 
-          curl -fL \
-            "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
-            -o "$GRADLE_DIR/gradle.zip"
+      curl -fL \
+        "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+        -o "$GRADLE_DIR/gradle.zip"
 
-          unzip -q -o \
-            "$GRADLE_DIR/gradle.zip" \
-            -d "$GRADLE_DIR"
+      unzip -q -o \
+        "$GRADLE_DIR/gradle.zip" \
+        -d "$GRADLE_DIR"
 
-          echo "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+      echo "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
 
-          "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin/gradle" --version
+      "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin/gradle" --version
 
-      - name: Build Debug APK
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Build Debug APK
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          echo "===== BUILDING WAVE LIVE APK ====="
+      echo "===== BUILDING WAVE LIVE APK ====="
 
-          gradle :app:assembleDebug --stacktrace
+      gradle :app:assembleDebug --stacktrace
 
-      - name: Verify APK
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Verify APK
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          APK="app/build/outputs/apk/debug/app-debug.apk"
+      APK="app/build/outputs/apk/debug/app-debug.apk"
 
-          if [ ! -f "$APK" ]; then
-            echo "APK NOT FOUND: $APK"
-            exit 1
-          fi
+      if [ ! -f "$APK" ]; then
+        echo "APK NOT FOUND: $APK"
+        exit 1
+      fi
 
-          echo "===== APK CREATED SUCCESSFULLY ====="
-          ls -lh "$APK"
+      echo "===== APK CREATED SUCCESSFULLY ====="
+      ls -lh "$APK"
 
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: Wave-Live-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
+  - name: Upload Debug APK
+    uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+    with:
+      name: Wave-Live-debug-apk
+      path: app/build/outputs/apk/debug/app-debug.apk
+      if-no-files-found: error
+      retention-days: 14
 
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 20
+  - name: Setup Node.js
+    uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+    with:
+      node-version: 20
 
-      - name: Install Worker dependencies
-        working-directory: worker
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Install Worker dependencies
+    working-directory: worker
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          npm install --no-audit --no-fund
+      npm install --no-audit --no-fund
 
-      - name: Verify Cloudflare authentication
-        working-directory: worker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Typecheck Worker
+    working-directory: worker
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            echo "ERROR: CLOUDFLARE_API_TOKEN GitHub Secret is missing."
-            exit 1
-          fi
+      echo "===== TYPECHECKING CLOUDFLARE WORKER ====="
 
-          echo "===== CLOUDFLARE AUTHENTICATION ====="
+      npm run typecheck --if-present
 
-          npx wrangler whoami
+      echo "===== WORKER TYPECHECK COMPLETE ====="
 
-      - name: Deploy Cloudflare Worker
-        working-directory: worker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Verify Cloudflare authentication
+    working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          echo "===== DEPLOYING WAVE LIVE WORKER ====="
+      if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+        echo "ERROR: CLOUDFLARE_API_TOKEN GitHub Secret is missing."
+        exit 1
+      fi
 
-          npx wrangler deploy
+      echo "===== CLOUDFLARE AUTHENTICATION ====="
 
-          echo "===== WORKER DEPLOYMENT COMPLETE ====="
+      npx wrangler whoami
 
-      - name: Verify deployed Worker
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Apply D1 migrations
+    working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          URL="https://worker-jolly-band-100e.mha19941024.workers.dev/health"
+      echo "===== APPLYING D1 MIGRATIONS ====="
 
-          echo "===== CHECKING DEPLOYED WORKER ====="
+      npx wrangler d1 migrations apply vyro-wave-prod --remote
 
-          STATUS=$(curl -L -s -o /tmp/health.json -w "%{http_code}" "$URL")
+      echo "===== D1 MIGRATIONS COMPLETE ====="
 
-          cat /tmp/health.json || true
+  - name: Deploy Cloudflare Worker
+    working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    shell: bash
+    run: |
+      set -euo pipefail
 
-          echo ""
+      echo "===== DEPLOYING WAVE LIVE WORKER ====="
 
-          if [ "$STATUS" != "200" ]; then
-            echo "Worker health check failed with HTTP $STATUS"
-            exit 1
-          fi
+      npx wrangler deploy
 
-          echo "===== WORKER HEALTH OK ====="
+      echo "===== WORKER DEPLOYMENT COMPLETE ====="
+
+  - name: Verify deployed Worker
+    shell: bash
+    run: |
+      set -euo pipefail
+
+      URL="https://worker-jolly-band-100e.mha19941024.workers.dev/health"
+
+      echo "===== CHECKING DEPLOYED WORKER ====="
+
+      STATUS=$(curl -L -s -o /tmp/health.json -w "%{http_code}" "$URL")
+
+      cat /tmp/health.json || true
+
+      echo ""
+
+      if [ "$STATUS" != "200" ]; then
+        echo "Worker health check failed with HTTP $STATUS"
+        exit 1
+      fi
+
+      echo "===== WORKER HEALTH OK ====="
