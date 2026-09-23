@@ -8,8 +8,8 @@ workers_dev = true
 ENVIRONMENT = "production"
 SESSION_DAYS = "30"
 
-# أضف قاعدة D1 الحالية هنا بعد معرفة database_id الحقيقي
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "wave-live"
-# database_id = "ضع_DATABASE_ID_الحقيقي_هنا"
+[[d1_databases]]
+binding = "DB"
+database_name = "vyro-wave-prod"
+database_id = "248e7a00-c27e-45c5-8980-f15736f4ec24"
+migrations_dir = "migrations"
